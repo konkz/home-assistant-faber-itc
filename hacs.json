@@ -1,4 +1,7 @@
 {
   "name": "Faber ITC Fireplace",
-  "render_readme": true
+  "render_readme": true,
+  "country": "DE",
+  "homeassistant": "2025.12.0",
+  "iot_class": "local_polling"
 }
