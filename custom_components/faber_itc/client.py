@@ -16,7 +16,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-TCP_TIMEOUT = 5.0
+TCP_TIMEOUT = 10.0 # Increased timeout for stability
 DEVICE_ID = 0x00007DED
 
 # Byte sequences for robust searching
@@ -63,45 +63,52 @@ class FaberITCClient:
         
         async with self._lock:
             try:
+                _LOGGER.debug("Connecting to %s:%s to send frame", self.host, self.port)
                 reader, writer = await asyncio.wait_for(
                     asyncio.open_connection(self.host, self.port),
                     timeout=TCP_TIMEOUT
                 )
+                _LOGGER.debug("Connection established to %s", self.host)
                 writer.write(payload)
                 await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
                 writer.close()
                 await writer.wait_closed()
+                _LOGGER.debug("Frame sent successfully and connection closed")
             except asyncio.TimeoutError:
                 _LOGGER.error("Timeout sending frame to %s", self.host)
                 raise
             except Exception as e:
-                _LOGGER.error("Error sending frame: %s", e)
+                _LOGGER.error("Error sending frame to %s: %s", self.host, e)
                 raise
 
     async def fetch_data(self):
         """Fetch current status from the device with robust byte-sequence reading."""
         async with self._lock:
             try:
+                _LOGGER.debug("Connecting to %s:%s to fetch data", self.host, self.port)
                 reader, writer = await asyncio.wait_for(
                     asyncio.open_connection(self.host, self.port),
                     timeout=TCP_TIMEOUT
                 )
+                _LOGGER.debug("Connection established to %s", self.host)
                 
-                # Passive phase: try to read existing data first (e.g. welcome message)
+                # Passive phase: try to read existing data first
                 buffer = b""
                 start_time = asyncio.get_event_loop().time()
                 
-                # First try to read without requesting (wait max 1s for passive data)
+                # First try to read without requesting (wait max 2s for passive data)
                 try:
-                    chunk = await asyncio.wait_for(reader.read(1024), timeout=1.0)
+                    chunk = await asyncio.wait_for(reader.read(1024), timeout=2.0)
                     if chunk:
                         buffer += chunk
-                        _LOGGER.debug("Received passive data: %s", buffer.hex())
+                        _LOGGER.debug("Received passive data (%d bytes): %s", len(chunk), chunk.hex())
                 except asyncio.TimeoutError:
+                    _LOGGER.debug("No passive data received within 2s")
                     pass
 
                 # If no frame found yet, send active request
                 if not self._find_frame(buffer):
+                    _LOGGER.debug("No frame in passive data, sending status request")
                     words = self._get_base_words()
                     words[4] = 0xFFFF0009 # Status Request Flag
                     payload = struct.pack(">15I", *words)
@@ -112,15 +119,22 @@ class FaberITCClient:
                 while True:
                     if asyncio.get_event_loop().time() - start_time > TCP_TIMEOUT:
                         _LOGGER.debug("Buffer state on timeout: %s", buffer.hex())
+                        writer.close()
+                        await writer.wait_closed()
                         raise asyncio.TimeoutError("Timeout searching for frame markers")
                         
                     chunk = await asyncio.wait_for(reader.read(1024), timeout=TCP_TIMEOUT)
                     if not chunk:
+                        _LOGGER.debug("Connection closed by device")
                         break
+                    
                     buffer += chunk
+                    _LOGGER.debug("Received chunk (%d bytes), total buffer: %d bytes. Hex: %s", 
+                                 len(chunk), len(buffer), chunk.hex())
                     
                     frame = self._find_frame(buffer)
                     if frame:
+                        _LOGGER.debug("Complete frame identified and parsed")
                         writer.close()
                         await writer.wait_closed()
                         return frame
@@ -130,10 +144,10 @@ class FaberITCClient:
                 return None
                 
             except asyncio.TimeoutError:
-                _LOGGER.error("Timeout fetching data from %s", self.host)
+                _LOGGER.error("Timeout fetching data from %s after %ss", self.host, TCP_TIMEOUT)
                 raise
             except Exception as e:
-                _LOGGER.error("Error fetching data: %s", e)
+                _LOGGER.error("Error fetching data from %s: %s", self.host, e)
                 raise
 
     def _find_frame(self, buffer):
@@ -147,10 +161,10 @@ class FaberITCClient:
                 
                 # Ensure we have enough data to unpack status words (min 12 words)
                 if len(frame_data) < 48:
+                    _LOGGER.debug("Frame found but too short for parsing (%d bytes)", len(frame_data))
                     return None
                     
                 # We unpack words starting from word 0 (Magic)
-                # Word 3: STATUS_MAIN, Word 4: FLAGS, Word 5: INTENSITY, Word 11: BURNER_MASK
                 try:
                     words = [struct.unpack(">I", frame_data[i:i+4])[0] for i in range(0, 48, 4)]
                     return {
