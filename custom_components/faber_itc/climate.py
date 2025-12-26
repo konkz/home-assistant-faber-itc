@@ -1,20 +1,33 @@
 import logging
 from homeassistant.components.climate import ClimateEntity, HVACMode, ClimateEntityFeature
-from .const import DOMAIN, STATUS_ON, INTENSITY_LEVELS
+from homeassistant.helpers.entity import DeviceInfo
+from .const import DOMAIN, STATUS_ON, INTENSITY_LEVELS, CONF_HOST
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, entry, async_add_entities):
     client = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([FaberFireplace(client)], update_before_add=True)
+    # Wichtig: update_before_add=False, da wir ein Push-Modell nutzen
+    async_add_entities([FaberFireplace(client, entry)], False)
 
 class FaberFireplace(ClimateEntity):
     _attr_has_entity_name = True
-    _attr_name = None # Übernimmt Name vom Gerät/Eintrag
+    _attr_name = None # Name wird vom Gerät übernommen
 
-    def __init__(self, client):
+    def __init__(self, client, entry):
         self._client = client
-        self._attr_unique_id = f"faber_fireplace_{id(client)}"
+        self._entry = entry
+        # Stabile Unique ID über die Entry ID
+        self._attr_unique_id = f"{entry.entry_id}_fireplace"
+        
+        # Verknüpfung zum Gerät unter "Geräte & Dienste"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name="Faber Kamin",
+            manufacturer="Faber",
+            model="Aspect Premium RD L",
+        )
+        
         self._attr_entity_picture = "/local/faber_icon.png"
         self._attr_hvac_mode = HVACMode.OFF
         self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
@@ -27,6 +40,8 @@ class FaberFireplace(ClimateEntity):
         self._attr_max_temp = 4
         self._attr_target_temperature = 1
         self._attr_target_temperature_step = 1
+        self._attr_icon = "mdi:fireplace"
+        
         self._client.register_callback(self._handle_status)
 
     def _handle_status(self, words):
