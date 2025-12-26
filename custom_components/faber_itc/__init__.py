@@ -1,6 +1,7 @@
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.exceptions import ConfigEntryNotReady
 from .const import DOMAIN, CONF_HOST, DEFAULT_PORT
 from .client import FaberITCClient
 from .coordinator import FaberITCUpdateCoordinator
@@ -24,8 +25,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     
     coordinator = FaberITCUpdateCoordinator(hass, client)
     
-    # First refresh
-    await coordinator.async_config_entry_first_refresh()
+    # First refresh with error handling to prevent bootstrap hangs
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except Exception as err:
+        raise ConfigEntryNotReady(f"Timeout while connecting to fireplace at {host}") from err
     
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator

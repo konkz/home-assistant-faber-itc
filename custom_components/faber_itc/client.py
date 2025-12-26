@@ -16,6 +16,8 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+TCP_TIMEOUT = 5.0
+
 class FaberITCClient:
     def __init__(self, host, port=DEFAULT_PORT):
         self.host = host
@@ -43,20 +45,29 @@ class FaberITCClient:
         
         async with self._lock:
             try:
-                reader, writer = await asyncio.open_connection(self.host, self.port)
+                reader, writer = await asyncio.wait_for(
+                    asyncio.open_connection(self.host, self.port),
+                    timeout=TCP_TIMEOUT
+                )
                 writer.write(payload)
-                await writer.drain()
+                await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
                 writer.close()
                 await writer.wait_closed()
+            except asyncio.TimeoutError:
+                _LOGGER.error("Timeout sending frame to %s", self.host)
+                raise
             except Exception as e:
-                _LOGGER.error(f"Error sending frame: {e}")
+                _LOGGER.error("Error sending frame: %s", e)
                 raise
 
     async def fetch_data(self):
         """Fetch current status from the device."""
         async with self._lock:
             try:
-                reader, writer = await asyncio.open_connection(self.host, self.port)
+                reader, writer = await asyncio.wait_for(
+                    asyncio.open_connection(self.host, self.port),
+                    timeout=TCP_TIMEOUT
+                )
                 
                 words = [0] * 15
                 words[0] = MAGIC_START
@@ -65,9 +76,9 @@ class FaberITCClient:
                 payload = struct.pack(">15I", *words)
                 
                 writer.write(payload)
-                await writer.drain()
+                await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
                 
-                data = await reader.readexactly(60)
+                data = await asyncio.wait_for(reader.readexactly(60), timeout=TCP_TIMEOUT)
                 writer.close()
                 await writer.wait_closed()
                 
@@ -87,7 +98,9 @@ class FaberITCClient:
                     "intensity": unpacked[5],
                     "burner_mask": unpacked[11],
                 }
-                
+            except asyncio.TimeoutError:
+                _LOGGER.error("Timeout fetching data from %s", self.host)
+                raise
             except Exception as e:
-                _LOGGER.error(f"Error fetching data: {e}")
+                _LOGGER.error("Error fetching data: %s", e)
                 raise
