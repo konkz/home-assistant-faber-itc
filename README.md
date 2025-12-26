@@ -32,7 +32,7 @@ Die Einrichtung erfolgt bequem über die Benutzeroberfläche:
 
 ## Technische Details
 
-Die Integration kommuniziert über den Port 80 (TCP) direkt mit dem ITC-Modul im lokalen Netzwerk. Es wird kein Cloud-Zugang benötigt.
+Die Integration kommuniziert über den Port 58779 (TCP) direkt mit dem ITC-Modul im lokalen Netzwerk. Es wird kein Cloud-Zugang benötigt.
 
 ### Protokoll-Struktur
 Das Protokoll verwendet binäre Frames mit folgendem Aufbau:
