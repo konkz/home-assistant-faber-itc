@@ -1,5 +1,6 @@
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.components.http import StaticPathConfig
 from .const import DOMAIN, DEFAULT_PORT, CONF_HOST
 from .client import FaberClient
 
@@ -7,7 +8,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Faber ITC from a config entry."""
     # Registriert den Ordner 'branding' unter dem URL-Pfad '/faber_itc_static'
     await hass.http.async_register_static_paths([
-        hass.http.StaticPathConfig(
+        StaticPathConfig(
             "/faber_itc_static",
             hass.config.path("custom_components/faber_itc/branding"),
             True
