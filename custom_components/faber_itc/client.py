@@ -19,6 +19,10 @@ _LOGGER = logging.getLogger(__name__)
 TCP_TIMEOUT = 5.0
 DEVICE_ID = 0x00007DED
 
+# Byte sequences for robust searching
+MAGIC_START_BYTES = struct.pack(">I", MAGIC_START)
+MAGIC_END_BYTES = b"\xFA\xFB\xFC\xFD"
+
 class FaberITCClient:
     def __init__(self, host, port=DEFAULT_PORT):
         self.host = host
@@ -40,7 +44,7 @@ class FaberITCClient:
         # Word 11 set by caller
         # Word 12 observed 0
         words[13] = 0x0000FAFB
-        words[14] = MAGIC_END
+        words[14] = 0xFCFD0000 # Corrected Trailer part
         return words
 
     async def send_frame(self, status_main, intensity, burner_mask):
@@ -75,7 +79,7 @@ class FaberITCClient:
                 raise
 
     async def fetch_data(self):
-        """Fetch current status from the device with robust frame reading."""
+        """Fetch current status from the device with robust byte-sequence reading."""
         async with self._lock:
             try:
                 reader, writer = await asyncio.wait_for(
@@ -83,20 +87,31 @@ class FaberITCClient:
                     timeout=TCP_TIMEOUT
                 )
                 
-                # Request status
-                words = self._get_base_words()
-                words[4] = 0xFFFF0009 # Status Request Flag
-                payload = struct.pack(">15I", *words)
-                
-                writer.write(payload)
-                await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
-                
-                # Robust reading: find magic start and end
+                # Passive phase: try to read existing data first (e.g. welcome message)
                 buffer = b""
                 start_time = asyncio.get_event_loop().time()
                 
+                # First try to read without requesting (wait max 1s for passive data)
+                try:
+                    chunk = await asyncio.wait_for(reader.read(1024), timeout=1.0)
+                    if chunk:
+                        buffer += chunk
+                        _LOGGER.debug("Received passive data: %s", buffer.hex())
+                except asyncio.TimeoutError:
+                    pass
+
+                # If no frame found yet, send active request
+                if not self._find_frame(buffer):
+                    words = self._get_base_words()
+                    words[4] = 0xFFFF0009 # Status Request Flag
+                    payload = struct.pack(">15I", *words)
+                    writer.write(payload)
+                    await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
+
+                # Active reading phase
                 while True:
                     if asyncio.get_event_loop().time() - start_time > TCP_TIMEOUT:
+                        _LOGGER.debug("Buffer state on timeout: %s", buffer.hex())
                         raise asyncio.TimeoutError("Timeout searching for frame markers")
                         
                     chunk = await asyncio.wait_for(reader.read(1024), timeout=TCP_TIMEOUT)
@@ -104,27 +119,11 @@ class FaberITCClient:
                         break
                     buffer += chunk
                     
-                    start_idx = buffer.find(struct.pack(">I", MAGIC_START))
-                    if start_idx != -1:
-                        end_idx = buffer.find(struct.pack(">I", MAGIC_END), start_idx)
-                        if end_idx != -1:
-                            # Frame found
-                            frame_data = buffer[start_idx : end_idx + 4]
-                            writer.close()
-                            await writer.wait_closed()
-                            
-                            # Parse frame (minimum 15 words)
-                            if len(frame_data) < 60:
-                                _LOGGER.error("Frame too short: %d bytes", len(frame_data))
-                                return None
-                                
-                            unpacked = struct.unpack(">15I", frame_data[:60])
-                            return {
-                                "status_main": unpacked[3],
-                                "flags": unpacked[4],
-                                "intensity": unpacked[5],
-                                "burner_mask": unpacked[11],
-                            }
+                    frame = self._find_frame(buffer)
+                    if frame:
+                        writer.close()
+                        await writer.wait_closed()
+                        return frame
                 
                 writer.close()
                 await writer.wait_closed()
@@ -136,3 +135,31 @@ class FaberITCClient:
             except Exception as e:
                 _LOGGER.error("Error fetching data: %s", e)
                 raise
+
+    def _find_frame(self, buffer):
+        """Search for a complete frame in the byte buffer."""
+        start_idx = buffer.find(MAGIC_START_BYTES)
+        if start_idx != -1:
+            end_idx = buffer.find(MAGIC_END_BYTES, start_idx)
+            if end_idx != -1:
+                # Frame found from MAGIC_START to MAGIC_END
+                frame_data = buffer[start_idx : end_idx + 4]
+                
+                # Ensure we have enough data to unpack status words (min 12 words)
+                if len(frame_data) < 48:
+                    return None
+                    
+                # We unpack words starting from word 0 (Magic)
+                # Word 3: STATUS_MAIN, Word 4: FLAGS, Word 5: INTENSITY, Word 11: BURNER_MASK
+                try:
+                    words = [struct.unpack(">I", frame_data[i:i+4])[0] for i in range(0, 48, 4)]
+                    return {
+                        "status_main": words[3],
+                        "flags": words[4],
+                        "intensity": words[5],
+                        "burner_mask": words[11],
+                    }
+                except Exception as e:
+                    _LOGGER.debug("Error parsing frame data: %s", e)
+                    return None
+        return None
