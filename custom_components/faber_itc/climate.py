@@ -44,7 +44,7 @@ class FaberFireplace(ClimateEntity):
         self._attr_target_temperature = 1
         self._attr_target_temperature_step = 1
         self._attr_icon = "mdi:fireplace"
-        self._attr_entity_picture = "/local/faber_icon.png"
+        self._attr_entity_picture = "/faber_itc_static/icon.png"
         
         self._client.register_callback(self._handle_status)
 
