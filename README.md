@@ -1,50 +1,38 @@
-# Faber ITC Home Assistant Integration
+# <img src="icon.png" width="32" height="32" align="center"> Faber ITC Integration for Home Assistant
 
-Diese Integration ermöglicht die Steuerung von Faber Gaskaminen mit ITC-Modul (z.B. Aspect Premium RD L) über Home Assistant. Das Protokoll wurde per Reverse Engineering der lokalen TCP-Kommunikation zwischen der Faber ITC App und dem Kamin-Modul analysiert.
-
-## Features
-
-- **An/Aus Steuerung:** Schalten des Kamins über Home Assistant.
-- **Flammenintensität:** Einstellung der Flammenhöhe in 5 Stufen (0%, 25%, 50%, 75%, 100%).
-- **Brenner-Modus:** Umschalten zwischen 1-Brenner und 2-Brenner Profilen.
-- **Status-Feedback:** Auslesen des aktuellen Zustands direkt vom Gerät.
-
-## Installation
-
-### HACS (Empfohlen)
-1. Öffne HACS in Home Assistant.
-2. Klicke auf die drei Punkte oben rechts und wähle "Custom repositories".
-3. Füge die URL dieses Repositories hinzu und wähle die Kategorie "Integration".
-4. Suche nach "Faber ITC" und installiere die Integration.
-5. Starte Home Assistant neu.
-
-### Manuell
-1. Kopiere den Ordner `custom_components/faber_itc` in deinen `custom_components` Ordner.
-2. Starte Home Assistant neu.
-
-## Konfiguration
-
-Die Einrichtung erfolgt bequem über die Benutzeroberfläche:
-1. Navigiere zu **Einstellungen** -> **Geräte & Dienste**.
-2. Klicke auf **Integration hinzufügen**.
-3. Suche nach **Faber ITC**.
-4. Gib die IP-Adresse deines Faber ITC Moduls ein (es wird empfohlen, eine feste IP im Router zu vergeben).
-
-## Technische Details
-
-Die Integration kommuniziert über den Port 58779 (TCP) direkt mit dem ITC-Modul im lokalen Netzwerk. Es wird kein Cloud-Zugang benötigt.
-
-### Protokoll-Struktur
-Das Protokoll verwendet binäre Frames mit folgendem Aufbau:
-- **Start-Magic:** `A1A2A3A4`
-- **End-Magic:** `FAFBFCFD`
-- **Endianness:** Big Endian (32-Bit Wörter)
-
-Weitere Details zum Protokoll findest du in der [faber_itc_protocol.md](faber_itc_protocol.md).
-
-## Disclaimer
-
-**Sicherheitshinweis:** Gasfeuerstellen sind sicherheitskritische Geräte. Diese Integration wurde durch Reverse Engineering erstellt und ist nicht offiziell vom Hersteller unterstützt. Die Nutzung erfolgt auf eigene Gefahr. Achte darauf, dass der Kamin jederzeit unter Aufsicht steht, wenn er betrieben wird.
+Steuere deinen Faber Gaskamin (ITC-Modul) lokal über Home Assistant. Kein Cloud-Zwang, volle Kontrolle.
 
 ---
-Entwickelt auf Basis von Analysen eines *Aspect Premium RD L (M4435200)*.
+
+### 🚀 Features
+- **Power:** Kamin an- und ausschalten.
+- **Flammenhöhe:** Präzise Steuerung in 5 Stufen (0-4).
+- **Brenner-Modi:** Unterstützung für 1- und 2-Brenner Profile.
+- **Lokale Kommunikation:** Schnell und zuverlässig via TCP (Port 58779).
+
+---
+
+### 📦 Installation
+
+#### Über HACS (Empfohlen)
+1. In HACS unter **Custom Repositories** diese URL hinzufügen: `https://github.com/konkz/home-assistant-faber-itc` (Kategorie: Integration).
+2. Installieren und HA neu starten.
+
+#### Manuell
+1. Ordner `custom_components/faber_itc` in dein `custom_components` Verzeichnis kopieren.
+2. HA neu starten.
+
+---
+
+### ⚙️ Konfiguration
+1. Gehe zu **Einstellungen > Geräte & Dienste**.
+2. Klicke auf **Integration hinzufügen** und suche nach **Faber ITC**.
+3. Gib die IP-Adresse deines Kamins ein.
+
+---
+
+### ⚠️ Disclaimer
+**Sicherheitshinweis:** Gasgeräte sind sensibel. Diese Integration basiert auf Reverse Engineering und wird nicht offiziell vom Hersteller unterstützt. Die Nutzung erfolgt auf eigene Gefahr. Kamine sollten während des Betriebs stets beaufsichtigt werden.
+
+---
+*Getestet mit Aspect Premium RD L (M4435200)*
