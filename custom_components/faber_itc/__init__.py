@@ -8,10 +8,14 @@ from .coordinator import FaberITCUpdateCoordinator
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Faber ITC from a config entry."""
     # Registriert den Ordner 'branding' unter dem URL-Pfad '/faber_itc_static'
-    hass.http.register_static_path(
-        "/faber_itc_static",
-        hass.config.path("custom_components/faber_itc/branding"),
-        cache_headers=True,
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(
+                "/faber_itc_static",
+                hass.config.path("custom_components/faber_itc/branding"),
+                True,
+            )
+        ]
     )
     
     host = entry.data[CONF_HOST]
