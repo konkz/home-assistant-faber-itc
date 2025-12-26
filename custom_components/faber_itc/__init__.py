@@ -1,7 +1,7 @@
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.http import StaticPathConfig
-from .const import DOMAIN, CONF_HOST
+from .const import DOMAIN, CONF_HOST, DEFAULT_PORT
 from .client import FaberITCClient
 from .coordinator import FaberITCUpdateCoordinator
 
@@ -19,8 +19,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     )
     
     host = entry.data[CONF_HOST]
-    # Default port 5555 according to instructions
-    client = FaberITCClient(host, 5555)
+    # Use DEFAULT_PORT from const.py
+    client = FaberITCClient(host, DEFAULT_PORT)
     
     coordinator = FaberITCUpdateCoordinator(hass, client)
     

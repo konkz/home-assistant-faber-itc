@@ -2,6 +2,7 @@ import asyncio
 import logging
 import struct
 from .const import (
+    DEFAULT_PORT,
     MAGIC_START,
     MAGIC_END,
     INTENSITY_LEVELS,
@@ -16,7 +17,7 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 class FaberITCClient:
-    def __init__(self, host, port=5555):
+    def __init__(self, host, port=DEFAULT_PORT):
         self.host = host
         self.port = port
         self._lock = asyncio.Lock()
