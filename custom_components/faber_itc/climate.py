@@ -1,26 +1,25 @@
 import logging
 from homeassistant.components.climate import ClimateEntity, HVACMode, ClimateEntityFeature
+from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers.entity import DeviceInfo
-from .const import DOMAIN, STATUS_ON, INTENSITY_LEVELS, CONF_HOST
+from .const import DOMAIN, STATUS_ON, INTENSITY_LEVELS
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up the Faber ITC climate platform."""
     client = hass.data[DOMAIN][entry.entry_id]
-    # Wichtig: update_before_add=False, da wir ein Push-Modell nutzen
-    async_add_entities([FaberFireplace(client, entry)], False)
+    async_add_entities([FaberFireplace(client, entry)])
 
 class FaberFireplace(ClimateEntity):
     _attr_has_entity_name = True
-    _attr_name = None # Name wird vom Gerät übernommen
+    _attr_name = None 
 
     def __init__(self, client, entry):
         self._client = client
         self._entry = entry
-        # Stabile Unique ID über die Entry ID
-        self._attr_unique_id = f"{entry.entry_id}_fireplace"
+        self._attr_unique_id = f"{entry.entry_id}_fireplace_entity"
         
-        # Verknüpfung zum Gerät unter "Geräte & Dienste"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name="Faber Kamin",
@@ -28,7 +27,9 @@ class FaberFireplace(ClimateEntity):
             model="Aspect Premium RD L",
         )
         
-        self._attr_entity_picture = "/local/faber_icon.png"
+        # ZWINGEND ERFORDERLICH für Climate Entitäten
+        self._attr_temperature_unit = UnitOfTemperature.CELSIUS
+        
         self._attr_hvac_mode = HVACMode.OFF
         self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
         self._attr_supported_features = (
@@ -36,11 +37,14 @@ class FaberFireplace(ClimateEntity):
             ClimateEntityFeature.TURN_ON | 
             ClimateEntityFeature.TURN_OFF
         )
+        
+        # Wir nutzen 0-4 als Proxy
         self._attr_min_temp = 0
         self._attr_max_temp = 4
         self._attr_target_temperature = 1
         self._attr_target_temperature_step = 1
         self._attr_icon = "mdi:fireplace"
+        self._attr_entity_picture = "/local/faber_icon.png"
         
         self._client.register_callback(self._handle_status)
 
