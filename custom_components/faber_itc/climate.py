@@ -15,6 +15,7 @@ class FaberFireplace(ClimateEntity):
     def __init__(self, client):
         self._client = client
         self._attr_unique_id = f"faber_fireplace_{id(client)}"
+        self._attr_entity_picture = "/local/faber_icon.png"
         self._attr_hvac_mode = HVACMode.OFF
         self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
         self._attr_supported_features = (
