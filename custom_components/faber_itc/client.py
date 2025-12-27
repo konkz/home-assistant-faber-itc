@@ -52,13 +52,13 @@ class FaberITCClient:
         async with self._lock:
             if self._writer:
                 return True
-            
+
             try:
                 _LOGGER.warning("Connecting to %s:%s", self.host, self.port)
                 self._reader, self._writer = await asyncio.wait_for(
                     asyncio.open_connection(self.host, self.port), timeout=TCP_TIMEOUT
                 )
-                
+
                 # Discovery Frame (Exakt 29 Bytes)
                 # Structure: Magic(4) + Ver(4) + ID(4) + Cmd(4) + Padding(9) + Trailer(4) = 29 bytes
                 discovery_payload = (
@@ -66,15 +66,17 @@ class FaberITCClient:
                     + b"\x00" * 9
                     + MAGIC_END_BYTES
                 )
-                
+
                 _LOGGER.warning("Sending Discovery (29 bytes) to %s", self.host)
                 self._writer.write(discovery_payload)
                 await self._writer.drain()
-                
+
                 # Start background read loop
+                if self._read_task:
+                    self._read_task.cancel()
                 self._read_task = asyncio.create_task(self._read_loop())
                 self._last_data_time = asyncio.get_event_loop().time()
-                
+
                 _LOGGER.warning("Long-lived connection established to %s", self.host)
                 return True
             except Exception as e:
@@ -106,26 +108,26 @@ class FaberITCClient:
                 if not chunk:
                     _LOGGER.warning("Connection closed by device")
                     break
-                
+
                 self._last_data_time = asyncio.get_event_loop().time()
                 buffer += chunk
-                
+
                 # Process all frames in buffer (find MAGIC_START ... MAGIC_END)
                 while True:
                     start_idx = buffer.find(MAGIC_START_BYTES)
                     if start_idx == -1:
                         buffer = buffer[-3:] # Keep partial magic start
                         break
-                    
+
                     end_idx = buffer.find(MAGIC_END_BYTES, start_idx)
                     if end_idx == -1:
                         break # Wait for more data to complete frame
-                    
+
                     frame_data = buffer[start_idx : end_idx + 4]
                     buffer = buffer[end_idx + 4:]
                     _LOGGER.warning("Received frame (%d bytes): %s", len(frame_data), frame_data.hex()[:60] + "...")
                     self._handle_frame(frame_data)
-                    
+
         except asyncio.CancelledError:
             pass
         except Exception as e:
@@ -138,7 +140,7 @@ class FaberITCClient:
         # 1. Parse ASCII metadata if frame is large enough
         if len(data) > 60:
             self._parse_ascii_info(data)
-            
+
         # 2. Parse Status
         if len(data) >= 16:
             status_main = struct.unpack(">I", data[12:16])[0]
@@ -146,13 +148,13 @@ class FaberITCClient:
                 intensity = 0
                 if len(data) >= 24:
                     intensity = struct.unpack(">I", data[20:24])[0]
-                
+
                 burner_mask = BURNER_OFF_MASK
                 if len(data) >= 48:
                     burner_mask = struct.unpack(">I", data[44:48])[0]
                 elif status_main == STATUS_ON:
                     burner_mask = BURNER_ON_MASK
-                
+
                 self.last_status = {
                     "status_main": status_main,
                     "intensity": intensity,
@@ -161,7 +163,7 @@ class FaberITCClient:
                     "manufacturer": self.device_info["manufacturer"],
                     "serial": self.device_info["serial"],
                 }
-                
+
                 if self._callback:
                     self._callback(self.last_status)
 
@@ -182,10 +184,10 @@ class FaberITCClient:
         """Send command using precise 29-byte structure."""
         if not await self.connect():
             raise ConnectionError("Not connected")
-            
+
         intensity_val = INTENSITY_LEVELS.get(intensity, 0)
         flags = 0xFFFF0009 if status_main in [STATUS_ON, STATUS_DUAL_BURNER] else 0x00000000
-        
+
         # Build 29-byte command
         # Structure: Magic(4) + Ver(4) + ID(4) + Status(4) + Flags(4) + Intensity(4) + Pad(1) + Trailer(4) = 29 bytes
         payload = (
@@ -193,7 +195,7 @@ class FaberITCClient:
             + b"\x00"
             + MAGIC_END_BYTES
         )
-        
+
         async with self._lock:
             try:
                 self._writer.write(payload)
