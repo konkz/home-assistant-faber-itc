@@ -2,6 +2,7 @@ import asyncio
 import logging
 import struct
 import traceback
+import re
 from .const import (
     DEFAULT_PORT,
     MAGIC_START,
@@ -29,10 +30,15 @@ class FaberITCClient:
         self.host = host
         self.port = port
         self._lock = asyncio.Lock()
+        self.device_info = {
+            "model": "Faber ITC Fireplace",
+            "manufacturer": "Faber",
+            "serial": None,
+            "fam": None
+        }
 
     async def _perform_handshake(self, reader, writer):
-        """Perform the discovery handshake with strict byte-precision (29 bytes)."""
-        # Discovery Frame from logs: a1a2a3a4 00fa0002 00000000 00000020 00000000 00000000 00 fafbfcfd
+        """Perform the mandatory discovery handshake and parse metadata."""
         discovery_payload = (
             struct.pack(">6I", MAGIC_START, 0x00FA0002, 0, 0x20, 0, 0)
             + b"\x00"
@@ -46,14 +52,36 @@ class FaberITCClient:
         # Read discovery response (Info frame)
         _LOGGER.warning("Waiting for discovery response from %s (timeout 3s)", self.host)
         try:
-            await asyncio.wait_for(self._read_frame(reader), timeout=3.0)
-            _LOGGER.warning("Handshake response received")
+            frame_data = await asyncio.wait_for(self._read_frame(reader), timeout=3.0)
+            if frame_data:
+                _LOGGER.warning("Handshake response received (%d bytes)", len(frame_data))
+                self._parse_ascii_info(frame_data)
         except asyncio.TimeoutError:
             _LOGGER.warning("Handshake response timeout - continuing anyway")
 
+    def _parse_ascii_info(self, data):
+        """Extract ASCII strings from Info frames to populate device_info."""
+        strings = re.findall(b"[ -~]{3,}", data)
+        for s in strings:
+            try:
+                text = s.decode("ascii").strip("\x00").strip()
+                if not text: continue
+                
+                if text == "Faber":
+                    self.device_info["manufacturer"] = text
+                elif text.startswith("M") and len(text) >= 8:
+                    self.device_info["serial"] = text
+                elif "Aspect" in text or "Premium" in text:
+                    self.device_info["model"] = text
+                elif text in ["ASG", "FAM"]:
+                    self.device_info["fam"] = text
+                    
+                _LOGGER.debug("Found ASCII metadata: %s", text)
+            except Exception:
+                continue
+
     def _build_command_payload(self, status_main, flags, intensity_val):
         """Build the 29-byte command frame structure from hex logs."""
-        # Command Hex from logs: a1a2a3a4 00fa0002 00007ded 00001030 00000000 00000000 00 fafbfcfd
         header = struct.pack(">3I", MAGIC_START, 0x00FA0002, DEVICE_ID)
         body = struct.pack(">3I", status_main, flags, intensity_val)
         padding = b"\x00"
@@ -80,7 +108,6 @@ class FaberITCClient:
                 end_idx = buffer.find(MAGIC_END_BYTES, start_idx)
                 if end_idx != -1:
                     frame_data = buffer[start_idx : end_idx + 4]
-                    _LOGGER.warning("Received frame (%d bytes): %s", len(frame_data), frame_data.hex())
                     return frame_data
         return None
 
@@ -106,7 +133,6 @@ class FaberITCClient:
                 writer.write(payload)
                 await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
                 
-                # Consume response
                 try:
                     await asyncio.wait_for(self._read_frame(reader), timeout=2.0)
                 except asyncio.TimeoutError:
@@ -130,14 +156,11 @@ class FaberITCClient:
                 
                 await self._perform_handshake(reader, writer)
                 
-                # Send Status Request (ID 7DED, Status 0x1030, 29 bytes)
                 payload = self._build_command_payload(0x00001030, 0, 0)
                 _LOGGER.warning("Sending Status Request (29 bytes) to %s", self.host)
                 writer.write(payload)
                 await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
 
-                # Read frames until we find a status frame
-                # Status frames usually have Word 3 = 1030, 1040, 1080
                 while True:
                     frame_data = await self._read_frame(reader)
                     if not frame_data:
@@ -157,12 +180,14 @@ class FaberITCClient:
                                 "flags": 0,
                                 "intensity": intensity,
                                 "burner_mask": BURNER_ON_MASK if status_main == STATUS_ON else BURNER_OFF_MASK,
+                                "model": self.device_info["model"],
+                                "manufacturer": self.device_info["manufacturer"],
+                                "serial": self.device_info["serial"],
                             }
                 
                 writer.close()
                 await writer.wait_closed()
                 return None
-                
             except Exception:
                 _LOGGER.error("Error in fetch_data:\n%s", traceback.format_exc())
                 raise

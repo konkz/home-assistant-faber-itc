@@ -37,13 +37,6 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_fireplace_entity"
 
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name="Faber Kamin",
-            manufacturer="Faber",
-            model="Aspect Premium RD L",
-        )
-
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
         self._attr_preset_modes = [PRESET_NONE, PRESET_BOOST]
@@ -54,7 +47,6 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
             | ClimateEntityFeature.PRESET_MODE
         )
 
-        # Intensity steps 0-4
         self._attr_min_temp = 0
         self._attr_max_temp = 4
         self._attr_target_temperature_step = 1
@@ -62,7 +54,21 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
         self._attr_entity_picture = "/faber_itc_static/icon.png"
 
     @property
+    def device_info(self) -> DeviceInfo:
+        """Return dynamic device info from client."""
+        data = self.coordinator.data or {}
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.entry_id)},
+            name="Faber Kamin",
+            manufacturer=data.get("manufacturer", "Faber"),
+            model=data.get("model", "Aspect Premium RD L"),
+            hw_version=data.get("serial"),
+        )
+
+    @property
     def hvac_mode(self):
+        if not self.coordinator.data:
+            return HVACMode.OFF
         status = self.coordinator.data.get("status_main")
         if status in [STATUS_ON, STATUS_DUAL_BURNER]:
             return HVACMode.HEAT
@@ -70,6 +76,8 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
 
     @property
     def target_temperature(self):
+        if not self.coordinator.data:
+            return 0.0
         intensity_val = self.coordinator.data.get("intensity", 0)
         for lvl, val in INTENSITY_LEVELS.items():
             if intensity_val == val:
@@ -78,6 +86,8 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
 
     @property
     def preset_mode(self):
+        if not self.coordinator.data:
+            return PRESET_NONE
         status = self.coordinator.data.get("status_main")
         if status == STATUS_DUAL_BURNER:
             return PRESET_BOOST
@@ -85,6 +95,9 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
 
     @property
     def extra_state_attributes(self):
+        if not self.coordinator.data:
+            return {}
+            
         intensity_val = self.coordinator.data.get("intensity", 0)
         burner_mask = self.coordinator.data.get("burner_mask")
         
@@ -106,11 +119,11 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
             "status_description": status_description,
             "burner_mask": hex(burner_mask) if burner_mask is not None else None,
             "intensity_raw": intensity_val,
+            "serial_number": self.coordinator.data.get("serial"),
         }
 
     async def async_set_hvac_mode(self, hvac_mode):
         if hvac_mode == HVACMode.HEAT:
-            # Default to 1 burner, level 1 if turning on
             await self._client.send_frame(STATUS_ON, 1, BURNER_ON_MASK)
         else:
             await self._client.send_frame(STATUS_OFF, 0, BURNER_OFF_MASK)
@@ -118,16 +131,15 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
 
     async def async_set_temperature(self, **kwargs):
         temp = int(kwargs.get("temperature", 1))
-        # Determine current burner/status
-        current_mask = self.coordinator.data.get("burner_mask", BURNER_ON_MASK)
-        current_status = self.coordinator.data.get("status_main", STATUS_ON)
+        current_mask = self.coordinator.data.get("burner_mask", BURNER_ON_MASK) if self.coordinator.data else BURNER_ON_MASK
+        current_status = self.coordinator.data.get("status_main", STATUS_ON) if self.coordinator.data else STATUS_ON
         
         await self._client.send_frame(current_status, temp, current_mask)
         await self.coordinator.async_request_refresh()
 
     async def async_set_preset_mode(self, preset_mode):
         intensity = int(self.target_temperature)
-        if intensity == 0: intensity = 1 # Minimum when turning on preset
+        if intensity == 0: intensity = 1
         
         if preset_mode == PRESET_BOOST:
             await self._client.send_frame(STATUS_DUAL_BURNER, intensity, BURNER_DUAL_MASK)
