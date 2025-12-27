@@ -39,6 +39,8 @@ class FaberITCClient:
 
     async def _perform_handshake(self, reader, writer):
         """Perform the mandatory discovery handshake and parse metadata."""
+        # Discovery Frame from logs: a1a2a3a4 00fa0002 00000000 00000020 00000000 00000000 00 fafbfcfd
+        # -> 29 bytes
         discovery_payload = (
             struct.pack(">6I", MAGIC_START, 0x00FA0002, 0, 0x20, 0, 0)
             + b"\x00"
@@ -81,9 +83,11 @@ class FaberITCClient:
                 continue
 
     def _build_command_payload(self, status_main, flags, intensity_val):
-        """Build the 29-byte command frame structure from hex logs."""
+        """Build the 33-byte command frame structure from hex logs."""
+        # a1a2a3a4 00fa0002 00007ded 00001030 00000000 00000000 00000000 00 fafbfcfd
+        # Header(8) + ID(4) + Status(4) + Flags(4) + Intensity(4) + ZeroWord(4) + Pad(1) + Trailer(4) = 33 bytes
         header = struct.pack(">3I", MAGIC_START, 0x00FA0002, DEVICE_ID)
-        body = struct.pack(">3I", status_main, flags, intensity_val)
+        body = struct.pack(">4I", status_main, flags, intensity_val, 0)
         padding = b"\x00"
         trailer = MAGIC_END_BYTES
         return header + body + padding + trailer
@@ -129,7 +133,7 @@ class FaberITCClient:
                 
                 await self._perform_handshake(reader, writer)
                 
-                _LOGGER.warning("Sending Command Frame (29 bytes) to %s", self.host)
+                _LOGGER.warning("Sending Command Frame (33 bytes) to %s", self.host)
                 writer.write(payload)
                 await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
                 
@@ -156,11 +160,13 @@ class FaberITCClient:
                 
                 await self._perform_handshake(reader, writer)
                 
+                # Send Status Request (ID 7DED, Status 0x1030, 33 bytes)
                 payload = self._build_command_payload(0x00001030, 0, 0)
-                _LOGGER.warning("Sending Status Request (29 bytes) to %s", self.host)
+                _LOGGER.warning("Sending Status Request (33 bytes) to %s", self.host)
                 writer.write(payload)
                 await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
 
+                # Read frames until we find a status frame
                 while True:
                     frame_data = await self._read_frame(reader)
                     if not frame_data:
