@@ -69,8 +69,9 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
     def hvac_mode(self):
         if not self.coordinator.data:
             return HVACMode.OFF
-        status = self.coordinator.data.get("status_main")
-        if status in [STATUS_ON, STATUS_DUAL_BURNER]:
+        status = self.coordinator.data.get("status_main", 0)
+        # Broad matching for status
+        if (status & 0xFFFF) in [0x1040, 0x1080]:
             return HVACMode.HEAT
         return HVACMode.OFF
 
@@ -79,17 +80,22 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
         if not self.coordinator.data:
             return 0.0
         intensity_val = self.coordinator.data.get("intensity", 0)
+        # Best match for intensity
+        closest_lvl = 0
+        min_diff = 999
         for lvl, val in INTENSITY_LEVELS.items():
-            if intensity_val == val:
-                return float(lvl)
-        return 0.0
+            diff = abs(intensity_val - val)
+            if diff < min_diff:
+                min_diff = diff
+                closest_lvl = lvl
+        return float(closest_lvl)
 
     @property
     def preset_mode(self):
         if not self.coordinator.data:
             return PRESET_NONE
-        status = self.coordinator.data.get("status_main")
-        if status == STATUS_DUAL_BURNER:
+        status = self.coordinator.data.get("status_main", 0)
+        if (status & 0xFFFF) == 0x1080:
             return PRESET_BOOST
         return PRESET_NONE
 
@@ -115,13 +121,20 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
             
         status_description = f"{burner_text}, Stufe {level}" if level > 0 else burner_text
         
-        return {
+        attrs = {
             "status_description": status_description,
             "burner_mask": hex(burner_mask) if burner_mask is not None else None,
             "intensity_raw": intensity_val,
             "serial_number": self.coordinator.data.get("serial"),
             "model_name": self.coordinator.data.get("model"),
+            "raw_words": self.coordinator.data.get("raw_words", []),
         }
+        
+        # Merge mined raw sensors into attributes
+        raw_sensors = self.coordinator.data.get("raw_sensors", {})
+        attrs.update(raw_sensors)
+        
+        return attrs
 
     async def async_set_hvac_mode(self, hvac_mode):
         if hvac_mode == HVACMode.HEAT:

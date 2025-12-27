@@ -86,17 +86,19 @@ class FaberITCClient:
 
     async def disconnect(self):
         """Close connection and cleanup."""
-        if self._read_task:
-            self._read_task.cancel()
-            self._read_task = None
-        if self._writer:
-            self._writer.close()
-            try:
-                await self._writer.wait_closed()
-            except:
-                pass
-            self._writer = None
-        self._reader = None
+        async with self._lock:
+            if self._read_task:
+                self._read_task.cancel()
+                self._read_task = None
+            if self._writer:
+                try:
+                    self._writer.close()
+                    await self._writer.wait_closed()
+                except Exception as e:
+                    _LOGGER.debug("Error closing writer: %s", e)
+                finally:
+                    self._writer = None
+            self._reader = None
 
     async def _read_loop(self):
         """Background loop to continuously empty the socket buffer."""
@@ -150,10 +152,16 @@ class FaberITCClient:
         for i in range(min(len(current_words), 32)):
             self._last_full_frame_words[i] = current_words[i]
 
-        status_main = current_words[3]
+        status_main = current_words[3] & 0xFFFFFFFF
         # Valid states: OFF (0x1030), ON (0x1040), DUAL (0x1080)
-        if status_main in [0x1030, 0x1040, 0x1080]:
-            intensity = current_words[5] if len(current_words) >= 6 else 0
+        # Note: We use mask and broad match to be sure
+        if (status_main & 0xFFFF) in [0x1030, 0x1040, 0x1080]:
+            # Intensity might be in word 5 (command style) or word 4 (some status styles)
+            intensity = 0
+            if len(current_words) >= 6:
+                intensity = current_words[5]
+            elif len(current_words) >= 5:
+                intensity = current_words[4]
             
             # Extract burner mask if available (usually word index 11)
             burner_mask = BURNER_OFF_MASK
