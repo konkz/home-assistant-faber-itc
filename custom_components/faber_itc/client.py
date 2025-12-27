@@ -110,23 +110,27 @@ class FaberITCClient:
                 if not chunk:
                     _LOGGER.warning("Connection closed by device")
                     break
-                
+
                 self._last_data_time = asyncio.get_event_loop().time()
                 buffer += chunk
-                
+
                 while True:
                     start_idx = buffer.find(MAGIC_START_BYTES)
                     if start_idx == -1:
                         buffer = buffer[-3:]
                         break
-                    
+
                     end_idx = buffer.find(MAGIC_END_BYTES, start_idx)
                     if end_idx == -1:
                         break
-                    
+
                     frame_data = buffer[start_idx : end_idx + 4]
                     buffer = buffer[end_idx + 4:]
-                    _LOGGER.warning("Received frame (%d bytes)", len(frame_data))
+                    _LOGGER.warning(
+                        "Received frame (%d bytes): %s",
+                        len(frame_data),
+                        frame_data.hex().upper(),
+                    )
                     self._handle_frame(frame_data)
                     
         except asyncio.CancelledError:
@@ -234,36 +238,43 @@ class FaberITCClient:
         intensity_val = INTENSITY_LEVELS.get(intensity, 0)
 
         # Build 29-byte Command Frame (7 Words: 28 Bytes + 1 Byte Padding/Trailer Part)
-        # We take the first 6 words (24 bytes) from the last known status to stay "stateful"
-        # Word 0: MAGIC, Word 1: Version, Word 2: Device ID, Word 3: Status, Word 4: Flags, Word 5: Intensity
-        words = list(self._last_full_frame_words[:6])
+        # We use a fixed structure like the discovery frame to be safe.
+        # Word 0: MAGIC
+        # Word 1: Version
+        # Word 2: Device ID
+        # Word 3: Status
+        # Bytes 16-19: Flags
+        # Bytes 20-23: Intensity
+        # Byte 24: 0x00 (Padding)
+        # Bytes 25-28: Trailer
 
-        # Fallback if no status was received yet or cache is empty
-        if len(words) < 6 or words[0] != MAGIC_START:
-            words = [MAGIC_START, 0x00FA0002, DEVICE_ID, status_main, 0, 0]
-        
-        # Stateful transformation:
-        # We keep Word 0, 1, 2 as they are from the last status (unless fallback)
-        # We only modify Word 3 (Status), Word 4 (Flags) and Word 5 (Intensity)
-        
-        words[3] = status_main
-        
-        # Word 4 (Flags): If the last status had flags, we keep them, 
-        # unless we are switching to OFF (0x1030), where flags usually go to 0.
-        if status_main == STATUS_OFF:
-            words[4] = 0x00000000
-        elif words[4] == 0 or words[4] == 0xFFFFFFFF:
-            # Only set default if previous word 4 was empty/invalid
-            words[4] = 0xFFFF0009
-            
-        words[5] = intensity_val
-        
-        # Construct the 29-byte payload:
-        # 6 Words (24 Bytes) + 1 Byte Padding (0x00) + MAGIC_END (4 Bytes) = 29 Bytes
-        payload = struct.pack(">6I", *words) + b"\x00" + MAGIC_END_BYTES
+        flags = 0x00000000
+        if status_main != STATUS_OFF:
+            # Try to get flags from cache (Word 4)
+            if (
+                len(self._last_full_frame_words) > 4
+                and self._last_full_frame_words[4] != 0
+            ):
+                flags = self._last_full_frame_words[4]
+            else:
+                flags = 0xFFFF0009
 
-        _LOGGER.warning("Sending Smart-Command: %s (Intensity: %d)", hex(status_main), intensity_val)
-        
+        # Construct 29-byte payload exaclty like discovery
+        payload = (
+            struct.pack(">4I", MAGIC_START, 0x00FA0002, DEVICE_ID, status_main)
+            + struct.pack(">I", flags)
+            + struct.pack(">I", intensity_val)
+            + b"\x00"
+            + MAGIC_END_BYTES
+        )
+
+        _LOGGER.warning(
+            "Sending Smart-Command (29 bytes): %s (Flags: %s, Intensity: %d)",
+            payload.hex().upper(),
+            hex(flags),
+            intensity_val,
+        )
+
         async with self._lock:
             try:
                 self._writer.write(payload)
