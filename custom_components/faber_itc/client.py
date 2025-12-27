@@ -31,9 +31,8 @@ class FaberITCClient:
         self._lock = asyncio.Lock()
 
     async def _perform_handshake(self, reader, writer):
-        """Perform the discovery handshake with strict byte-precision."""
-        # Discovery Hex: a1a2a3a4 00fa0002 00000000 00000020 00000000 00000000 00 fafbfcfd
-        # -> 6 words (24 bytes) + 1 padding byte + 4 bytes trailer = 29 bytes.
+        """Perform the discovery handshake with strict byte-precision (29 bytes)."""
+        # Discovery Frame from logs: a1a2a3a4 00fa0002 00000000 00000020 00000000 00000000 00 fafbfcfd
         discovery_payload = (
             struct.pack(">6I", MAGIC_START, 0x00FA0002, 0, 0x20, 0, 0)
             + b"\x00"
@@ -44,7 +43,7 @@ class FaberITCClient:
         writer.write(discovery_payload)
         await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
         
-        # Read discovery response (optional, don't crash if device is silent)
+        # Read discovery response (Info frame)
         _LOGGER.warning("Waiting for discovery response from %s (timeout 3s)", self.host)
         try:
             await asyncio.wait_for(self._read_frame(reader), timeout=3.0)
@@ -53,11 +52,10 @@ class FaberITCClient:
             _LOGGER.warning("Handshake response timeout - continuing anyway")
 
     def _build_command_payload(self, status_main, flags, intensity_val):
-        """Build the 33-byte command frame structure from hex logs."""
-        # Command Hex: a1a2a3a4 00fa0002 00007ded 00001030 00000000 00000000 00000000 00 fafbfcfd
-        # -> 7 words (28 bytes) + 1 byte padding + 4 bytes trailer = 33 bytes.
+        """Build the 29-byte command frame structure from hex logs."""
+        # Command Hex from logs: a1a2a3a4 00fa0002 00007ded 00001030 00000000 00000000 00 fafbfcfd
         header = struct.pack(">3I", MAGIC_START, 0x00FA0002, DEVICE_ID)
-        body = struct.pack(">4I", status_main, flags, intensity_val, 0)
+        body = struct.pack(">3I", status_main, flags, intensity_val)
         padding = b"\x00"
         trailer = MAGIC_END_BYTES
         return header + body + padding + trailer
@@ -104,7 +102,7 @@ class FaberITCClient:
                 
                 await self._perform_handshake(reader, writer)
                 
-                _LOGGER.warning("Sending Command Frame (33 bytes) to %s", self.host)
+                _LOGGER.warning("Sending Command Frame (29 bytes) to %s", self.host)
                 writer.write(payload)
                 await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
                 
@@ -122,7 +120,7 @@ class FaberITCClient:
                 raise
 
     async def fetch_data(self):
-        """Fetch status using the stateful sequence."""
+        """Fetch status using the stateful sequence and multi-frame reading."""
         async with self._lock:
             try:
                 _LOGGER.warning("Connecting to %s to fetch data", self.host)
@@ -132,30 +130,39 @@ class FaberITCClient:
                 
                 await self._perform_handshake(reader, writer)
                 
-                # Send Status Request (ID 7DED, Status 0x1030)
+                # Send Status Request (ID 7DED, Status 0x1030, 29 bytes)
                 payload = self._build_command_payload(0x00001030, 0, 0)
-                _LOGGER.warning("Sending Status Request (33 bytes) to %s", self.host)
+                _LOGGER.warning("Sending Status Request (29 bytes) to %s", self.host)
                 writer.write(payload)
                 await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
 
-                frame_data = await self._read_frame(reader)
+                # Read frames until we find a status frame
+                # Status frames usually have Word 3 = 1030, 1040, 1080
+                while True:
+                    frame_data = await self._read_frame(reader)
+                    if not frame_data:
+                        break
+                        
+                    if len(frame_data) >= 16:
+                        status_main = struct.unpack(">I", frame_data[12:16])[0]
+                        if status_main in [0x1030, 0x1040, 0x1080]:
+                            intensity = 0
+                            if len(frame_data) >= 24:
+                                intensity = struct.unpack(">I", frame_data[20:24])[0]
+                            
+                            writer.close()
+                            await writer.wait_closed()
+                            return {
+                                "status_main": status_main,
+                                "flags": 0,
+                                "intensity": intensity,
+                                "burner_mask": BURNER_ON_MASK if status_main == STATUS_ON else BURNER_OFF_MASK,
+                            }
+                
                 writer.close()
                 await writer.wait_closed()
-                
-                if frame_data and len(frame_data) >= 16:
-                    # status_main is Word 3 -> Byte 12-15
-                    status_main = struct.unpack(">I", frame_data[12:16])[0]
-                    intensity = 0
-                    if len(frame_data) >= 24:
-                        intensity = struct.unpack(">I", frame_data[20:24])[0]
-                    
-                    return {
-                        "status_main": status_main,
-                        "flags": 0,
-                        "intensity": intensity,
-                        "burner_mask": BURNER_ON_MASK if status_main == STATUS_ON else BURNER_OFF_MASK,
-                    }
                 return None
+                
             except Exception:
                 _LOGGER.error("Error in fetch_data:\n%s", traceback.format_exc())
                 raise
