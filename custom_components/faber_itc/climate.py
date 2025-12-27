@@ -141,7 +141,8 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
             await self._client.send_frame(STATUS_ON, 1, BURNER_ON_MASK)
         else:
             await self._client.send_frame(STATUS_OFF, 0, BURNER_OFF_MASK)
-        await self.coordinator.async_request_refresh()
+        # Non-blocking refresh to avoid UI lag and race conditions
+        self.hass.async_create_task(self.coordinator.async_request_refresh())
 
     async def async_set_temperature(self, **kwargs):
         temp = int(kwargs.get("temperature", 1))
@@ -149,7 +150,7 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
         current_status = self.coordinator.data.get("status_main", STATUS_ON) if self.coordinator.data else STATUS_ON
         
         await self._client.send_frame(current_status, temp, current_mask)
-        await self.coordinator.async_request_refresh()
+        self.hass.async_create_task(self.coordinator.async_request_refresh())
 
     async def async_set_preset_mode(self, preset_mode):
         intensity = int(self.target_temperature)
@@ -159,7 +160,7 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
             await self._client.send_frame(STATUS_DUAL_BURNER, intensity, BURNER_DUAL_MASK)
         else:
             await self._client.send_frame(STATUS_ON, intensity, BURNER_ON_MASK)
-        await self.coordinator.async_request_refresh()
+        self.hass.async_create_task(self.coordinator.async_request_refresh())
 
     async def async_turn_on(self):
         await self.async_set_hvac_mode(HVACMode.HEAT)

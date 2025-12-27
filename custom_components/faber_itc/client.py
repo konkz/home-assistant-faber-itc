@@ -43,6 +43,7 @@ class FaberITCClient:
         }
         self.last_status = None
         self._last_full_frame_words = [0] * 32  # Extended cache for sensor mining
+        self._last_command_time = 0
 
     def set_callback(self, callback):
         """Set callback for status updates."""
@@ -156,6 +157,19 @@ class FaberITCClient:
         # Valid states: OFF (0x1030), ON (0x1040), DUAL (0x1080)
         # Note: We use mask and broad match to be sure
         if (status_main & 0xFFFF) in [0x1030, 0x1040, 0x1080]:
+            # Ignore incoming intensity 0 for 2 seconds after a command was sent
+            # to prevent flickering if the fireplace sends an intermediate "empty" status.
+            now = asyncio.get_event_loop().time()
+            if now - self._last_command_time < 2.0:
+                intensity = 0
+                if len(current_words) >= 6:
+                    intensity = current_words[5]
+                elif len(current_words) >= 5:
+                    intensity = current_words[4]
+                
+                if intensity == 0 and self.last_status and self.last_status["intensity"] > 0:
+                    _LOGGER.debug("Ignoring intensity 0 shortly after command (Anti-Flicker)")
+                    return
             # Intensity might be in word 5 (command style) or word 4 (some status styles)
             intensity = 0
             if len(current_words) >= 6:
@@ -254,6 +268,15 @@ class FaberITCClient:
             try:
                 self._writer.write(payload)
                 await self._writer.drain()
+                
+                # Optimistic Update: Immediately reflect the desired state in last_status
+                # to prevent the coordinator from reading old data on the next refresh.
+                if self.last_status:
+                    self.last_status["status_main"] = status_main
+                    self.last_status["intensity"] = intensity_val
+                    self.last_status["burner_mask"] = burner_mask
+                
+                self._last_command_time = asyncio.get_event_loop().time()
                 return True
             except Exception as e:
                 _LOGGER.error("Failed to send command: %s", e)
