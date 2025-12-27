@@ -19,9 +19,9 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 TCP_TIMEOUT = 10.0
+WATCHDOG_TIMEOUT = 120.0 # Reconnect if no data for 2 mins
 DEVICE_ID = 0x00007DED
 
-# Byte sequences for robust searching
 MAGIC_START_BYTES = struct.pack(">I", MAGIC_START)
 MAGIC_END_BYTES = b"\xFA\xFB\xFC\xFD"
 
@@ -30,167 +30,178 @@ class FaberITCClient:
         self.host = host
         self.port = port
         self._lock = asyncio.Lock()
+        self._reader = None
+        self._writer = None
+        self._read_task = None
+        self._callback = None
+        self._last_data_time = 0
         self.device_info = {
             "model": "Faber ITC Fireplace",
             "manufacturer": "Faber",
             "serial": None,
             "fam": None
         }
+        self.last_status = None
 
-    async def _perform_handshake(self, reader, writer):
-        """Perform only the discovery handshake and gather initial info."""
-        # Discovery Frame (ID 0, Word 3 = 0x20) -> 29 bytes
-        discovery_payload = (
-            struct.pack(">6I", MAGIC_START, 0x00FA0002, 0, 0x20, 0, 0)
-            + b"\x00"
-            + MAGIC_END_BYTES
-        )
-        
-        _LOGGER.warning("Handshake: Sending Discovery to %s", self.host)
-        writer.write(discovery_payload)
-        await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
-        
-        # Read the immediate responses (usually Info frames)
-        # We wait a bit longer here to clear the welcome burst from the fireplace
-        _LOGGER.warning("Handshake: Listening for initial device info from %s", self.host)
+    def set_callback(self, callback):
+        """Set callback for status updates."""
+        self._callback = callback
+
+    async def connect(self):
+        """Establish a long-lived connection with handshake."""
+        async with self._lock:
+            if self._writer:
+                return True
+            
+            try:
+                _LOGGER.warning("Connecting to %s:%s", self.host, self.port)
+                self._reader, self._writer = await asyncio.wait_for(
+                    asyncio.open_connection(self.host, self.port), timeout=TCP_TIMEOUT
+                )
+                
+                # Mandatory Discovery
+                discovery_payload = (
+                    struct.pack(">6I", MAGIC_START, 0x00FA0002, 0, 0x20, 0, 0)
+                    + b"\x00"
+                    + MAGIC_END_BYTES
+                )
+                self._writer.write(discovery_payload)
+                await self._writer.drain()
+                
+                # Start background read loop
+                self._read_task = asyncio.create_task(self._read_loop())
+                self._last_data_time = asyncio.get_event_loop().time()
+                
+                _LOGGER.warning("Long-lived connection established to %s", self.host)
+                return True
+            except Exception as e:
+                _LOGGER.error("Connection failed: %s", e)
+                await self.disconnect()
+                return False
+
+    async def disconnect(self):
+        """Close connection and cleanup."""
+        if self._read_task:
+            self._read_task.cancel()
+            self._read_task = None
+        if self._writer:
+            self._writer.close()
+            try:
+                await self._writer.wait_closed()
+            except:
+                pass
+            self._writer = None
+        self._reader = None
+
+    async def _read_loop(self):
+        """Background loop to continuously empty the socket buffer."""
+        buffer = b""
         try:
-            # We try to read for up to 3 seconds to catch the model info
-            start_time = asyncio.get_event_loop().time()
-            while asyncio.get_event_loop().time() - start_time < 3.0:
-                frame = await asyncio.wait_for(self._read_frame(reader), timeout=1.5)
-                if frame:
-                    self._parse_ascii_info(frame)
-        except asyncio.TimeoutError:
-            _LOGGER.warning("Handshake: Initial info burst finished")
+            while True:
+                chunk = await self._reader.read(4096)
+                if not chunk:
+                    _LOGGER.warning("Connection closed by device")
+                    break
+                
+                self._last_data_time = asyncio.get_event_loop().time()
+                buffer += chunk
+                
+                # Process all frames in buffer
+                while True:
+                    start_idx = buffer.find(MAGIC_START_BYTES)
+                    if start_idx == -1:
+                        buffer = buffer[-3:] # Keep partial magic start
+                        break
+                    
+                    end_idx = buffer.find(MAGIC_END_BYTES, start_idx)
+                    if end_idx == -1:
+                        break
+                    
+                    frame_data = buffer[start_idx : end_idx + 4]
+                    buffer = buffer[end_idx + 4:]
+                    self._handle_frame(frame_data)
+                    
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            _LOGGER.error("Read loop error: %s", e)
+        finally:
+            asyncio.create_task(self.disconnect())
+
+    def _handle_frame(self, data):
+        """Parse received frames and trigger callbacks."""
+        # 1. Check for ASCII Info
+        if len(data) > 60:
+            self._parse_ascii_info(data)
+            
+        # 2. Check for Status
+        if len(data) >= 16:
+            status_main = struct.unpack(">I", data[12:16])[0]
+            if status_main in [0x1030, 0x1040, 0x1080]:
+                intensity = 0
+                if len(data) >= 24:
+                    intensity = struct.unpack(">I", data[20:24])[0]
+                
+                burner_mask = BURNER_OFF_MASK
+                if len(data) >= 48:
+                    burner_mask = struct.unpack(">I", data[44:48])[0]
+                elif status_main == STATUS_ON:
+                    burner_mask = BURNER_ON_MASK
+                
+                self.last_status = {
+                    "status_main": status_main,
+                    "intensity": intensity,
+                    "burner_mask": burner_mask,
+                    "model": self.device_info["model"],
+                    "manufacturer": self.device_info["manufacturer"],
+                    "serial": self.device_info["serial"],
+                }
+                
+                if self._callback:
+                    self._callback(self.last_status)
 
     def _parse_ascii_info(self, data):
-        """Extract ASCII strings from Info frames to populate device_info."""
+        """Extract metadata from frames."""
         strings = re.findall(b"[ -~]{3,}", data)
         for s in strings:
             try:
                 text = s.decode("ascii").strip("\x00").strip()
                 if not text: continue
-                
-                if text == "Faber":
-                    self.device_info["manufacturer"] = text
-                elif text.startswith("M") and len(text) >= 8:
-                    self.device_info["serial"] = text
-                elif "Aspect" in text or "Premium" in text:
-                    self.device_info["model"] = text
-                elif text in ["ASG", "FAM"]:
-                    self.device_info["fam"] = text
-            except Exception:
-                continue
-
-    def _build_command_payload(self, status_main, flags, intensity_val):
-        """Build the 33-byte command frame structure."""
-        header = struct.pack(">3I", MAGIC_START, 0x00FA0002, DEVICE_ID)
-        body = struct.pack(">4I", status_main, flags, intensity_val, 0)
-        padding = b"\x00"
-        trailer = MAGIC_END_BYTES
-        return header + body + padding + trailer
-
-    async def _read_frame(self, reader):
-        """Robustly read a single frame from the stream."""
-        buffer = b""
-        start_time = asyncio.get_event_loop().time()
-        while True:
-            if asyncio.get_event_loop().time() - start_time > TCP_TIMEOUT:
-                return None
-                
-            try:
-                chunk = await asyncio.wait_for(reader.read(4096), timeout=2.0)
-                if not chunk: break
-                buffer += chunk
-                
-                start_idx = buffer.find(MAGIC_START_BYTES)
-                if start_idx != -1:
-                    end_idx = buffer.find(MAGIC_END_BYTES, start_idx)
-                    if end_idx != -1:
-                        frame_data = buffer[start_idx : end_idx + 4]
-                        _LOGGER.warning("Received frame (%d bytes): %s", len(frame_data), frame_data.hex()[:100] + "...")
-                        return frame_data
-            except asyncio.TimeoutError:
-                break
-        return None
+                if text == "Faber": self.device_info["manufacturer"] = text
+                elif text.startswith("M") and len(text) >= 8: self.device_info["serial"] = text
+                elif "Aspect" in text or "Premium" in text: self.device_info["model"] = text
+                elif text in ["ASG", "FAM"]: self.device_info["fam"] = text
+            except: continue
 
     async def send_frame(self, status_main, intensity, burner_mask):
-        """Send a command frame with mandatory handshake."""
-        if intensity not in INTENSITY_LEVELS:
-            raise ValueError(f"Invalid intensity level: {intensity}")
-        
-        intensity_val = INTENSITY_LEVELS[intensity]
+        """Send command using the persistent connection."""
+        if not await self.connect():
+            raise ConnectionError("Not connected")
+            
+        intensity_val = INTENSITY_LEVELS.get(intensity, 0)
         flags = 0xFFFF0009 if status_main in [STATUS_ON, STATUS_DUAL_BURNER] else 0x00000000
-        payload = self._build_command_payload(status_main, flags, intensity_val)
+        
+        # Build 33-byte command
+        header = struct.pack(">3I", MAGIC_START, 0x00FA0002, DEVICE_ID)
+        body = struct.pack(">4I", status_main, flags, intensity_val, 0)
+        payload = header + body + b"\x00" + MAGIC_END_BYTES
         
         async with self._lock:
             try:
-                _LOGGER.warning("Connecting to %s to send command", self.host)
-                reader, writer = await asyncio.wait_for(
-                    asyncio.open_connection(self.host, self.port), timeout=TCP_TIMEOUT
-                )
-                
-                await self._perform_handshake(reader, writer)
-                
-                _LOGGER.warning("Sending Command Frame (33 bytes) to %s", self.host)
-                writer.write(payload)
-                await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
-                
-                # Wait briefly for ack
-                await asyncio.sleep(0.5)
-                
-                writer.close()
-                await writer.wait_closed()
-                _LOGGER.warning("Command sequence complete")
-            except Exception:
-                _LOGGER.error("Error in send_frame:\n%s", traceback.format_exc())
+                self._writer.write(payload)
+                await asyncio.wait_for(self._writer.drain(), timeout=TCP_TIMEOUT)
+                _LOGGER.warning("Command sent: %s", payload.hex())
+            except Exception as e:
+                _LOGGER.error("Failed to send command: %s", e)
+                await self.disconnect()
                 raise
 
     async def fetch_data(self):
-        """Fetch status using passive listening after handshake."""
-        async with self._lock:
-            try:
-                _LOGGER.warning("Connecting to %s for passive fetch", self.host)
-                reader, writer = await asyncio.wait_for(
-                    asyncio.open_connection(self.host, self.port), timeout=TCP_TIMEOUT
-                )
-                
-                await self._perform_handshake(reader, writer)
-                
-                # Instead of active polling, we now just listen for frames
-                # that look like status updates (W3 = 1030, 1040, 1080)
-                _LOGGER.warning("Passive Mode: Listening for status updates from %s", self.host)
-                
-                status_data = None
-                start_time = asyncio.get_event_loop().time()
-                
-                # Listen for up to 5 seconds for any status frame
-                while asyncio.get_event_loop().time() - start_time < 5.0:
-                    frame_data = await self._read_frame(reader)
-                    if not frame_data: break
-                        
-                    if len(frame_data) >= 16:
-                        status_main = struct.unpack(">I", frame_data[12:16])[0]
-                        # If we find a status frame, we take it
-                        if status_main in [0x1030, 0x1040, 0x1080]:
-                            intensity = 0
-                            if len(frame_data) >= 24:
-                                intensity = struct.unpack(">I", frame_data[20:24])[0]
-                            
-                            status_data = {
-                                "status_main": status_main,
-                                "flags": 0,
-                                "intensity": intensity,
-                                "burner_mask": BURNER_ON_MASK if status_main == STATUS_ON else BURNER_OFF_MASK,
-                                "model": self.device_info["model"],
-                                "manufacturer": self.device_info["manufacturer"],
-                                "serial": self.device_info["serial"],
-                            }
-                            break
-                
-                writer.close()
-                await writer.wait_closed()
-                return status_data
-            except Exception:
-                _LOGGER.error("Error in fetch_data:\n%s", traceback.format_exc())
-                raise
+        """Watchdog check and return latest cached status."""
+        now = asyncio.get_event_loop().time()
+        if self._writer and (now - self._last_data_time > WATCHDOG_TIMEOUT):
+            _LOGGER.warning("Watchdog: No data for %ss, reconnecting", WATCHDOG_TIMEOUT)
+            await self.disconnect()
+            
+        await self.connect()
+        return self.last_status

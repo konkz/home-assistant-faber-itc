@@ -31,6 +31,9 @@ Steuere deinen Faber Gaskamin (ITC-Modul) lokal über Home Assistant. Kein Cloud
 
 ---
 
+### 📱 App-Parallelität
+**Wichtiger Hinweis:** Das ITC-Modul des Kamins erlaubt in der Regel nur **eine aktive TCP-Verbindung**. Wenn du die offizielle Faber ITC App auf deinem Smartphone öffnest, kann es sein, dass die Home Assistant Integration die Verbindung verliert oder Fehlermeldungen anzeigt. Für eine stabile Nutzung in Home Assistant sollte die Smartphone-App vollständig geschlossen sein.
+
 ### ⚠️ Disclaimer
 **Sicherheitshinweis:** Gasgeräte sind sensibel. Diese Integration basiert auf Reverse Engineering und wird nicht offiziell vom Hersteller unterstützt. Die Nutzung erfolgt auf eigene Gefahr. Kamine sollten während des Betriebs stets beaufsichtigt werden.
 

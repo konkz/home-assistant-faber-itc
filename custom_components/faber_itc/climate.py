@@ -61,7 +61,7 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
             identifiers={(DOMAIN, self._entry.entry_id)},
             name="Faber Kamin",
             manufacturer=data.get("manufacturer", "Faber"),
-            model=data.get("model", "Aspect Premium RD L"),
+            model=data.get("model", "Faber ITC Fireplace"),
             hw_version=data.get("serial"),
         )
 
@@ -120,6 +120,7 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
             "burner_mask": hex(burner_mask) if burner_mask is not None else None,
             "intensity_raw": intensity_val,
             "serial_number": self.coordinator.data.get("serial"),
+            "model_name": self.coordinator.data.get("model"),
         }
 
     async def async_set_hvac_mode(self, hvac_mode):

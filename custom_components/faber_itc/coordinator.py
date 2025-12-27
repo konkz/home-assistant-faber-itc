@@ -17,13 +17,22 @@ class FaberITCUpdateCoordinator(DataUpdateCoordinator):
             name="Faber ITC Status",
             update_interval=timedelta(seconds=30),
         )
+        
+        # Register callback for event-driven updates from the client's read loop
+        self.client.set_callback(self._handle_client_update)
+
+    def _handle_client_update(self, data):
+        """Handle status update from client read loop."""
+        _LOGGER.debug("Coordinator received event-driven update")
+        self.async_set_updated_data(data)
 
     async def _async_update_data(self):
-        """Fetch data from client."""
+        """Fetch data from client (Watchdog check)."""
         try:
+            # fetch_data now checks the watchdog/connection and returns cached status
             data = await self.client.fetch_data()
             if data is None:
-                raise UpdateFailed("Invalid data received from device")
+                return {}
             return data
         except Exception as err:
             raise UpdateFailed(f"Error communicating with API: {err}")
