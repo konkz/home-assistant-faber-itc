@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import struct
+import traceback
 from .const import (
     DEFAULT_PORT,
     MAGIC_START,
@@ -30,170 +31,124 @@ class FaberITCClient:
         self._lock = asyncio.Lock()
 
     async def _perform_handshake(self, reader, writer):
-        """Perform the mandatory stateful discovery handshake."""
-        # Step 1: Send Discovery Frame (ID 0, Word 3 = 0x20) - 32 Bytes
-        discovery_words = [
-            MAGIC_START,
-            0x00FA0002,
-            0x00000000, # ID 0
-            0x00000020, # Word 3 = 0x20
-            0x00000000,
-            0x00000000,
-            0x00000000,
-            0xFAFBFCFD, # Trailer
-        ]
-        payload = struct.pack(">8I", *discovery_words)
+        """Perform the mandatory stateful discovery handshake based on hex logs."""
+        # Discovery Frame: a1a2a3a4 00fa0002 00000000 00000020 00000000 00000000 00000000 fafbfcfd
+        # 8 words = 32 bytes (Note: User log shows 32 bytes for discovery)
+        discovery_payload = struct.pack(">8I", 
+            MAGIC_START, 0x00FA0002, 0x00000000, 0x00000020, 
+            0x00000000, 0x00000000, 0x00000000, MAGIC_END
+        )
         
         _LOGGER.warning("Sending Discovery Frame (ID 0) to %s", self.host)
-        writer.write(payload)
+        writer.write(discovery_payload)
         await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
         
-        # Step 2: Read and discard incoming info frame
+        # Read discovery response
         _LOGGER.warning("Waiting for discovery response from %s", self.host)
-        buffer = b""
-        start_time = asyncio.get_event_loop().time()
-        while True:
-            if asyncio.get_event_loop().time() - start_time > 5.0:
-                _LOGGER.warning("Handshake response timeout (discarding and continuing)")
-                break
-                
-            chunk = await asyncio.wait_for(reader.read(1024), timeout=2.0)
-            if not chunk:
-                break
-            buffer += chunk
-            _LOGGER.warning("Handshake data received (%d bytes): %s", len(chunk), chunk.hex())
-            if MAGIC_END_BYTES in buffer:
-                _LOGGER.warning("Discovery response complete")
-                break
+        await self._read_frame(reader)
+        _LOGGER.warning("Handshake complete")
 
-    def _build_command_payload(self, status_main, intensity_val, flags=0xFFFF0009):
-        """Build the 33-byte command frame structure."""
-        # Hex structure: a1a2a3a4 00fa0002 00007ded 00001030 00000000 00000000 00000000 00 fafbfcfd
+    def _build_command_payload(self, status_main, flags, intensity_val):
+        """Build the 29-byte command frame structure from hex logs."""
+        # Structure: [Magic 4b] [Ver 4b] [ID 4b] [Status 4b] [Flags 4b] [Intens 4b] [00000000 4b] [Pad 1b] [Trailer 4b]
+        # Example: a1a2a3a4 00fa0002 00007ded 00001030 00000000 00000000 00000000 00 fafbfcfd
         header = struct.pack(">3I", MAGIC_START, 0x00FA0002, DEVICE_ID)
         body = struct.pack(">4I", status_main, flags, intensity_val, 0)
         padding = b"\x00"
         trailer = MAGIC_END_BYTES
         return header + body + padding + trailer
 
+    async def _read_frame(self, reader):
+        """Robustly read a single frame from the stream."""
+        buffer = b""
+        start_time = asyncio.get_event_loop().time()
+        while True:
+            if asyncio.get_event_loop().time() - start_time > TCP_TIMEOUT:
+                _LOGGER.warning("Read frame timeout. Buffer: %s", buffer.hex())
+                raise asyncio.TimeoutError("Timeout searching for frame markers")
+                
+            chunk = await asyncio.wait_for(reader.read(4096), timeout=TCP_TIMEOUT)
+            if not chunk:
+                _LOGGER.warning("Connection closed by device during read")
+                break
+            buffer += chunk
+            
+            start_idx = buffer.find(MAGIC_START_BYTES)
+            if start_idx != -1:
+                end_idx = buffer.find(MAGIC_END_BYTES, start_idx)
+                if end_idx != -1:
+                    frame_data = buffer[start_idx : end_idx + 4]
+                    _LOGGER.warning("Received frame (%d bytes): %s", len(frame_data), frame_data.hex())
+                    return frame_data
+        return None
+
     async def send_frame(self, status_main, intensity, burner_mask):
-        """Send a binary frame to the device with stateful handshake."""
+        """Send a command frame with handshake."""
         if intensity not in INTENSITY_LEVELS:
-            raise ValueError(f"Invalid intensity level: {intensity}. Must be 0-4.")
+            raise ValueError(f"Invalid intensity level: {intensity}")
         
         intensity_val = INTENSITY_LEVELS[intensity]
-        # Ensure correct flags for commands
-        command_flags = 0xFFFF0005 if status_main in [STATUS_ON, STATUS_DUAL_BURNER] else 0x00000000
-        payload = self._build_command_payload(status_main, intensity_val, command_flags)
+        flags = 0xFFFF0009 if status_main in [STATUS_ON, STATUS_DUAL_BURNER] else 0x00000000
+        payload = self._build_command_payload(status_main, flags, intensity_val)
         
         async with self._lock:
             try:
                 _LOGGER.warning("Connecting to %s to send command", self.host)
                 reader, writer = await asyncio.wait_for(
-                    asyncio.open_connection(self.host, self.port),
-                    timeout=TCP_TIMEOUT
+                    asyncio.open_connection(self.host, self.port), timeout=TCP_TIMEOUT
                 )
                 
                 await self._perform_handshake(reader, writer)
                 
-                _LOGGER.warning("Sending Command Frame (ID 7DED) to %s", self.host)
+                _LOGGER.warning("Sending Command Frame to %s", self.host)
                 writer.write(payload)
                 await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
                 
-                # Optional: Read response to clear buffer
-                try:
-                    await asyncio.wait_for(reader.read(1024), timeout=1.0)
-                except:
-                    pass
-                    
+                # Consume response
+                await self._read_frame(reader)
+                
                 writer.close()
                 await writer.wait_closed()
                 _LOGGER.warning("Command sequence complete")
-            except Exception as e:
-                _LOGGER.error("Error in command sequence: %s", e)
+            except Exception:
+                _LOGGER.error("Error in send_frame:\n%s", traceback.format_exc())
                 raise
 
     async def fetch_data(self):
-        """Fetch status using the stateful handshake sequence."""
+        """Fetch status using the stateful sequence."""
         async with self._lock:
             try:
                 _LOGGER.warning("Connecting to %s to fetch data", self.host)
                 reader, writer = await asyncio.wait_for(
-                    asyncio.open_connection(self.host, self.port),
-                    timeout=TCP_TIMEOUT
+                    asyncio.open_connection(self.host, self.port), timeout=TCP_TIMEOUT
                 )
                 
                 await self._perform_handshake(reader, writer)
                 
-                # Send Status Request (using 0x1030 frame or just a normal ping)
-                payload = self._build_command_payload(0x00001030, 0, 0x00000000)
+                # Send Status Request (ID 7DED, Status 0x1030)
+                payload = self._build_command_payload(0x00001030, 0, 0)
                 _LOGGER.warning("Sending Status Request to %s", self.host)
                 writer.write(payload)
                 await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
 
-                buffer = b""
-                start_time = asyncio.get_event_loop().time()
-                while True:
-                    if asyncio.get_event_loop().time() - start_time > TCP_TIMEOUT:
-                        _LOGGER.warning("Buffer state on timeout: %s", buffer.hex())
-                        writer.close()
-                        await writer.wait_closed()
-                        raise asyncio.TimeoutError("Timeout searching for frame markers")
-                        
-                    chunk = await asyncio.wait_for(reader.read(1024), timeout=TCP_TIMEOUT)
-                    if not chunk:
-                        _LOGGER.warning("Connection closed by device")
-                        break
-                    
-                    buffer += chunk
-                    _LOGGER.warning("Received chunk (%d bytes): %s", len(chunk), chunk.hex())
-                    
-                    frame = self._find_frame(buffer)
-                    if frame:
-                        _LOGGER.warning("Complete frame identified and parsed")
-                        writer.close()
-                        await writer.wait_closed()
-                        return frame
-                
+                frame_data = await self._read_frame(reader)
                 writer.close()
                 await writer.wait_closed()
-                return None
                 
-            except Exception as e:
-                _LOGGER.error("Error fetching data from %s: %s", self.host, e)
-                raise
-
-    def _find_frame(self, buffer):
-        """Search for a complete frame in the byte buffer."""
-        start_idx = buffer.find(MAGIC_START_BYTES)
-        if start_idx != -1:
-            end_idx = buffer.find(MAGIC_END_BYTES, start_idx)
-            if end_idx != -1:
-                # Frame found
-                frame_data = buffer[start_idx : end_idx + 4]
-                
-                if len(frame_data) < 16:
-                    return None
-                    
-                try:
-                    # Parse status from Word 3 (Byte 12-15)
+                if frame_data and len(frame_data) >= 16:
                     status_main = struct.unpack(">I", frame_data[12:16])[0]
-                    # Default other values if frame is short
                     intensity = 0
-                    burner_mask = BURNER_OFF_MASK
-                    
                     if len(frame_data) >= 24:
-                        intensity_raw = struct.unpack(">I", frame_data[20:24])[0]
-                        intensity = intensity_raw
-                    if len(frame_data) >= 48:
-                        burner_mask = struct.unpack(">I", frame_data[44:48])[0]
-
+                        intensity = struct.unpack(">I", frame_data[20:24])[0]
+                    
                     return {
                         "status_main": status_main,
                         "flags": 0,
                         "intensity": intensity,
-                        "burner_mask": burner_mask,
+                        "burner_mask": BURNER_ON_MASK if status_main == STATUS_ON else BURNER_OFF_MASK,
                     }
-                except Exception as e:
-                    _LOGGER.warning("Error parsing frame data: %s", e)
-                    return None
-        return None
+                return None
+                
+            except Exception:
+                _LOGGER.error("Error in fetch_data:\n%s", traceback.format_exc())
+                raise
