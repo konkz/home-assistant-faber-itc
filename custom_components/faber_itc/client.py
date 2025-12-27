@@ -32,12 +32,8 @@ class FaberITCClient:
 
     async def _perform_handshake(self, reader, writer):
         """Perform the mandatory discovery handshake with precise byte lengths."""
-        # Discovery Frame from user hex: 
-        # a1a2a3a4 00fa0002 00000000 00000020 00000000 00000000 0000 fafbfcfd
-        # -> 6 words (24 bytes) + 2 bytes padding + 4 bytes trailer = 30 bytes?
-        # Re-counting: a1a2a3a4 (4) 00fa0002 (4) 00000000 (4) 00000020 (4) 00000000 (4) 00000000 (4) 0000 (2) fafbfcfd (4)
+        # Discovery Frame: a1a2a3a4 00fa0002 00000000 00000020 00000000 00000000 0000 fafbfcfd
         # Total = 30 bytes.
-        
         discovery_payload = (
             struct.pack(">6I", MAGIC_START, 0x00FA0002, 0, 0x20, 0, 0)
             + b"\x00\x00"
@@ -57,11 +53,9 @@ class FaberITCClient:
             _LOGGER.warning("Handshake response timeout - continuing anyway")
 
     def _build_command_payload(self, status_main, flags, intensity_val):
-        """Build the 29-byte command frame structure from hex logs."""
+        """Build the 33-byte command frame structure from hex logs."""
         # Structure: a1a2a3a4 00fa0002 00007ded 00001030 00000000 00000000 00000000 00 fafbfcfd
-        # -> 7 words (28 bytes) + 1 byte padding + 4 bytes trailer = 33 bytes?
-        # Re-counting: a1a2a3a4 (4) 00fa0002 (4) 00007ded (4) 00001030 (4) 00000000 (4) 00000000 (4) 00000000 (4) 00 (1) fafbfcfd (4)
-        # Total = 33 bytes. 
+        # Total = 33 bytes.
         header = struct.pack(">3I", MAGIC_START, 0x00FA0002, DEVICE_ID)
         body = struct.pack(">4I", status_main, flags, intensity_val, 0)
         padding = b"\x00"
@@ -149,7 +143,6 @@ class FaberITCClient:
                 await writer.wait_closed()
                 
                 if frame_data and len(frame_data) >= 16:
-                    # status_main is Word 3 -> Byte 12-15
                     status_main = struct.unpack(">I", frame_data[12:16])[0]
                     intensity = 0
                     if len(frame_data) >= 24:
@@ -162,3 +155,6 @@ class FaberITCClient:
                         "burner_mask": BURNER_ON_MASK if status_main == STATUS_ON else BURNER_OFF_MASK,
                     }
                 return None
+            except Exception:
+                _LOGGER.error("Error in fetch_data:\n%s", traceback.format_exc())
+                raise
