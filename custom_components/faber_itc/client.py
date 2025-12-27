@@ -60,7 +60,6 @@ class FaberITCClient:
                 )
 
                 # Discovery Frame (Exakt 29 Bytes)
-                # Structure: Magic(4) + Ver(4) + ID(4) + Cmd(4) + Padding(9) + Trailer(4) = 29 bytes
                 discovery_payload = (
                     struct.pack(">4I", MAGIC_START, 0x00FA0002, 0, 0x20)
                     + b"\x00" * 9
@@ -99,11 +98,10 @@ class FaberITCClient:
         self._reader = None
 
     async def _read_loop(self):
-        """Background loop to continuously empty the socket buffer using read_until logic."""
+        """Background loop to continuously empty the socket buffer."""
         buffer = b""
         try:
             while True:
-                # We use a simple read but process until the trailer is found
                 chunk = await self._reader.read(4096)
                 if not chunk:
                     _LOGGER.warning("Connection closed by device")
@@ -112,20 +110,19 @@ class FaberITCClient:
                 self._last_data_time = asyncio.get_event_loop().time()
                 buffer += chunk
 
-                # Process all frames in buffer (find MAGIC_START ... MAGIC_END)
                 while True:
                     start_idx = buffer.find(MAGIC_START_BYTES)
                     if start_idx == -1:
-                        buffer = buffer[-3:] # Keep partial magic start
+                        buffer = buffer[-3:]
                         break
 
                     end_idx = buffer.find(MAGIC_END_BYTES, start_idx)
                     if end_idx == -1:
-                        break # Wait for more data to complete frame
+                        break
 
                     frame_data = buffer[start_idx : end_idx + 4]
                     buffer = buffer[end_idx + 4:]
-                    _LOGGER.warning("Received frame (%d bytes): %s", len(frame_data), frame_data.hex()[:60] + "...")
+                    _LOGGER.warning("Received frame (%d bytes)", len(frame_data))
                     self._handle_frame(frame_data)
 
         except asyncio.CancelledError:
@@ -137,11 +134,9 @@ class FaberITCClient:
 
     def _handle_frame(self, data):
         """Parse received frames and trigger callbacks."""
-        # 1. Parse ASCII metadata if frame is large enough
         if len(data) > 60:
             self._parse_ascii_info(data)
 
-        # 2. Parse Status
         if len(data) >= 16:
             status_main = struct.unpack(">I", data[12:16])[0]
             if status_main in [0x1030, 0x1040, 0x1080]:
@@ -168,7 +163,7 @@ class FaberITCClient:
                     self._callback(self.last_status)
 
     def _parse_ascii_info(self, data):
-        """Extract metadata from frames using regex."""
+        """Extract metadata from frames."""
         strings = re.findall(b"[ -~]{3,}", data)
         for s in strings:
             try:
@@ -188,8 +183,6 @@ class FaberITCClient:
         intensity_val = INTENSITY_LEVELS.get(intensity, 0)
         flags = 0xFFFF0009 if status_main in [STATUS_ON, STATUS_DUAL_BURNER] else 0x00000000
 
-        # Build 29-byte command
-        # Structure: Magic(4) + Ver(4) + ID(4) + Status(4) + Flags(4) + Intensity(4) + Pad(1) + Trailer(4) = 29 bytes
         payload = (
             struct.pack(">6I", MAGIC_START, 0x00FA0002, DEVICE_ID, status_main, flags, intensity_val)
             + b"\x00"
@@ -205,3 +198,13 @@ class FaberITCClient:
                 _LOGGER.error("Failed to send command: %s", e)
                 await self.disconnect()
                 raise
+
+    async def fetch_data(self):
+        """Watchdog check and return latest cached status."""
+        now = asyncio.get_event_loop().time()
+        if self._writer and (now - self._last_data_time > WATCHDOG_TIMEOUT):
+            _LOGGER.warning("Watchdog: No data for %ss, reconnecting", WATCHDOG_TIMEOUT)
+            await self.disconnect()
+            
+        await self.connect()
+        return self.last_status
