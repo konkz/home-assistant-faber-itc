@@ -194,6 +194,16 @@ class FaberITCClient:
                 elif text in ["ASG", "FAM"]: self.device_info["fam"] = text
             except: continue
 
+    async def fetch_data(self):
+        """Watchdog check and return latest cached status."""
+        now = asyncio.get_event_loop().time()
+        if self._writer and (now - self._last_data_time > WATCHDOG_TIMEOUT):
+            _LOGGER.warning("Watchdog: No data for %ss, reconnecting", WATCHDOG_TIMEOUT)
+            await self.disconnect()
+
+        await self.connect()
+        return self.last_status
+
     async def send_frame(self, status_main, intensity, burner_mask):
         """Send command using stateful 29-byte structure and dynamic flags."""
         if not await self.connect():
