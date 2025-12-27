@@ -31,27 +31,37 @@ class FaberITCClient:
         self._lock = asyncio.Lock()
 
     async def _perform_handshake(self, reader, writer):
-        """Perform the mandatory stateful discovery handshake based on hex logs."""
-        # Discovery Frame: a1a2a3a4 00fa0002 00000000 00000020 00000000 00000000 00000000 fafbfcfd
-        # 8 words = 32 bytes (Note: User log shows 32 bytes for discovery)
-        discovery_payload = struct.pack(">8I", 
-            MAGIC_START, 0x00FA0002, 0x00000000, 0x00000020, 
-            0x00000000, 0x00000000, 0x00000000, MAGIC_END
+        """Perform the mandatory discovery handshake with precise byte lengths."""
+        # Discovery Frame from user hex: 
+        # a1a2a3a4 00fa0002 00000000 00000020 00000000 00000000 0000 fafbfcfd
+        # -> 6 words (24 bytes) + 2 bytes padding + 4 bytes trailer = 30 bytes?
+        # Re-counting: a1a2a3a4 (4) 00fa0002 (4) 00000000 (4) 00000020 (4) 00000000 (4) 00000000 (4) 0000 (2) fafbfcfd (4)
+        # Total = 30 bytes.
+        
+        discovery_payload = (
+            struct.pack(">6I", MAGIC_START, 0x00FA0002, 0, 0x20, 0, 0)
+            + b"\x00\x00"
+            + MAGIC_END_BYTES
         )
         
-        _LOGGER.warning("Sending Discovery Frame (ID 0) to %s", self.host)
+        _LOGGER.warning("Sending Discovery Frame (ID 0, 30 bytes) to %s", self.host)
         writer.write(discovery_payload)
         await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
         
-        # Read discovery response
-        _LOGGER.warning("Waiting for discovery response from %s", self.host)
-        await self._read_frame(reader)
-        _LOGGER.warning("Handshake complete")
+        # Read discovery response (optional, don't crash if device is silent)
+        _LOGGER.warning("Waiting for discovery response from %s (timeout 3s)", self.host)
+        try:
+            await asyncio.wait_for(self._read_frame(reader), timeout=3.0)
+            _LOGGER.warning("Handshake response received")
+        except asyncio.TimeoutError:
+            _LOGGER.warning("Handshake response timeout - continuing anyway")
 
     def _build_command_payload(self, status_main, flags, intensity_val):
         """Build the 29-byte command frame structure from hex logs."""
-        # Structure: [Magic 4b] [Ver 4b] [ID 4b] [Status 4b] [Flags 4b] [Intens 4b] [00000000 4b] [Pad 1b] [Trailer 4b]
-        # Example: a1a2a3a4 00fa0002 00007ded 00001030 00000000 00000000 00000000 00 fafbfcfd
+        # Structure: a1a2a3a4 00fa0002 00007ded 00001030 00000000 00000000 00000000 00 fafbfcfd
+        # -> 7 words (28 bytes) + 1 byte padding + 4 bytes trailer = 33 bytes?
+        # Re-counting: a1a2a3a4 (4) 00fa0002 (4) 00007ded (4) 00001030 (4) 00000000 (4) 00000000 (4) 00000000 (4) 00 (1) fafbfcfd (4)
+        # Total = 33 bytes. 
         header = struct.pack(">3I", MAGIC_START, 0x00FA0002, DEVICE_ID)
         body = struct.pack(">4I", status_main, flags, intensity_val, 0)
         padding = b"\x00"
@@ -64,12 +74,12 @@ class FaberITCClient:
         start_time = asyncio.get_event_loop().time()
         while True:
             if asyncio.get_event_loop().time() - start_time > TCP_TIMEOUT:
-                _LOGGER.warning("Read frame timeout. Buffer: %s", buffer.hex())
+                if buffer:
+                    _LOGGER.warning("Read frame timeout. Buffer state: %s", buffer.hex())
                 raise asyncio.TimeoutError("Timeout searching for frame markers")
                 
             chunk = await asyncio.wait_for(reader.read(4096), timeout=TCP_TIMEOUT)
             if not chunk:
-                _LOGGER.warning("Connection closed by device during read")
                 break
             buffer += chunk
             
@@ -100,12 +110,15 @@ class FaberITCClient:
                 
                 await self._perform_handshake(reader, writer)
                 
-                _LOGGER.warning("Sending Command Frame to %s", self.host)
+                _LOGGER.warning("Sending Command Frame (33 bytes) to %s", self.host)
                 writer.write(payload)
                 await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
                 
                 # Consume response
-                await self._read_frame(reader)
+                try:
+                    await asyncio.wait_for(self._read_frame(reader), timeout=2.0)
+                except asyncio.TimeoutError:
+                    pass
                 
                 writer.close()
                 await writer.wait_closed()
@@ -127,7 +140,7 @@ class FaberITCClient:
                 
                 # Send Status Request (ID 7DED, Status 0x1030)
                 payload = self._build_command_payload(0x00001030, 0, 0)
-                _LOGGER.warning("Sending Status Request to %s", self.host)
+                _LOGGER.warning("Sending Status Request (33 bytes) to %s", self.host)
                 writer.write(payload)
                 await asyncio.wait_for(writer.drain(), timeout=TCP_TIMEOUT)
 
@@ -136,6 +149,7 @@ class FaberITCClient:
                 await writer.wait_closed()
                 
                 if frame_data and len(frame_data) >= 16:
+                    # status_main is Word 3 -> Byte 12-15
                     status_main = struct.unpack(">I", frame_data[12:16])[0]
                     intensity = 0
                     if len(frame_data) >= 24:
@@ -148,7 +162,3 @@ class FaberITCClient:
                         "burner_mask": BURNER_ON_MASK if status_main == STATUS_ON else BURNER_OFF_MASK,
                     }
                 return None
-                
-            except Exception:
-                _LOGGER.error("Error in fetch_data:\n%s", traceback.format_exc())
-                raise
