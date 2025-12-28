@@ -153,15 +153,30 @@ class FaberITCClient:
         opcode_base = opcode_raw & 0x0FFFFFFF
         payload = data[16:-4]
 
+        # Payload Structure: Reserved(8) | Length(1) | Data(Length)
+        if len(payload) < 9:
+            return
+            
+        expected_len = payload[8]
+        actual_len = len(payload) - 9
+        
+        if expected_len != actual_len:
+            _LOGGER.warning(
+                "Payload length mismatch for Opcode 0x%08X: Expected %d, got %d", 
+                opcode_raw, expected_len, actual_len
+            )
+            # We still continue for now as it might be a known variation, 
+            # but we logged it.
+
         if opcode_base == OP_STATUS:
             _LOGGER.debug("FABER ITC: Received 1030 Payload (len=%d): %s", len(payload), payload.hex())
             if len(payload) >= 22:
-                # payload[0:8] = Reserved/Session
-                # payload[8] = 0x20
-                state = payload[11]
-                flame = payload[15]
-                width = payload[16]
-                temp_raw = payload[21]
+                data_part = payload[9:]
+                # Offsets relative to data_part (Payload Offset - 9)
+                state = data_part[2]   # Offset 11
+                flame = data_part[6]   # Offset 15
+                width = data_part[7]   # Offset 16
+                temp_raw = data_part[12] # Offset 21
                 
                 self.last_status.update({
                     "state": state,

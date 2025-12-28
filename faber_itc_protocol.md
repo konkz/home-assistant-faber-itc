@@ -16,10 +16,16 @@ Alle Nachrichten folgen einem festen Paket-Aufbau von mindestens 24 Bytes. Stand
 | **Protokoll-Header** | 4 Bytes | `00 FA 00 02` (Version & Konstante) |
 | **Sender-ID** | 4 Bytes | Client: `00 00 7D ED`, Server: `FA C4 2C D8` |
 | **Opcode** | 4 Bytes | Big-Endian (siehe Opcodes) |
-| **Payload** | Variabel | Dateninhalt |
+| **Payload** | Variabel | Dateninhalt (siehe unten) |
 | **Magic End** | 4 Bytes | `FA FB FC FD` |
 
-### 1.1 Opcode-Logik
+### 1.1 Payload-Struktur
+Die Payload folgt einem festen Schema:
+`Reserved/Session (8 Bytes) | Length (1 Byte) | Data (Length Bytes)`
+
+Das Byte an **Payload-Offset 8** gibt exakt an, wie viele Bytes im Data-Teil folgen (`Length = Total_Payload_Len - 9`).
+
+### 1.2 Opcode-Logik
 Der Opcode ist ein 32-Bit-Wert.
 - **Anfragen (Requests):** Bit 28 ist `0` (z.B. `00 00 10 30`).
 - **Antworten (Responses):** Bit 28 ist `1` (z.B. `10 00 10 30`).
@@ -41,14 +47,15 @@ Der Opcode ist ein 32-Bit-Wert.
 
 ## 3. Telemetrie (Status-Frame 1030)
 
-Die Response auf `1030` enthält eine 41-Byte Payload. Die Werte liegen an festen Offsets:
+Die Response auf `1030` enthält eine 41-Byte Payload (Längenbyte an Offset 8 ist `0x20` = 32).
+Struktur des Data-Teils (ab Payload-Offset 9):
 
-| Offset (Payload) | Bedeutung | Werte / Kodierung |
-| :--- | :--- | :--- |
-| **11** | Kamin-Status | `00`: Aus, `01`: An, `04`: Zündvorgang, `05`: Aus-Vorgang |
-| **15** | Flammenhöhe | `00`, `19` (1), `32` (2), `4B` (3), `64` (4) |
-| **16** | Flammenbreite | `32`: Schmal, `64`: Breit |
-| **21** | Raumtemperatur | Hex-Wert / 10 (z.B. `F3` = 243 = 24.3°C) |
+| Offset (Payload) | Offset (Data) | Bedeutung | Werte / Kodierung |
+| :--- | :--- | :--- | :--- |
+| **11** | **2** | Kamin-Status | `00`: Aus, `01`: An, `04`: Zündvorgang, `05`: Aus-Vorgang |
+| **15** | **6** | Flammenhöhe | `00`, `19` (1), `32` (2), `4B` (3), `64` (4) |
+| **16** | **7** | Flammenbreite | `32`: Schmal, `64`: Breit |
+| **21** | **12** | Raumtemperatur | Hex-Wert / 10 (z.B. `F3` = 243 = 24.3°C) |
 
 ---
 
