@@ -152,9 +152,11 @@ class FaberITCClient:
         opcode_base = opcode_raw & 0x0FFFFFFF
         payload = data[20:-4]
 
-        if opcode_base == OP_STATUS:
-            if len(payload) >= 41:
-                # Based on refined analysis:
+        if opcode_base in [OP_STATUS, OP_HEARTBEAT]:
+            # Both 1030 and 1080 responses can contain telemetry in some firmware versions,
+            # but 1030 is the primary source. Both are typically 41 bytes.
+            if len(payload) >= 22:
+                # Based on detailed byte-level analysis:
                 state = payload[11]
                 flame = payload[15]
                 width = payload[16]
