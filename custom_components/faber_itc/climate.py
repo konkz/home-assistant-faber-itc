@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from homeassistant.components.climate import (
     ClimateEntity,
@@ -15,9 +16,11 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+_LOGGER.info("FABER ITC: Loading climate platform version 0.2.31")
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the Faber ITC climate platform."""
+    _LOGGER.info("FABER ITC: async_setup_entry climate starting")
     coordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities([FaberFireplace(coordinator, entry)])
 
