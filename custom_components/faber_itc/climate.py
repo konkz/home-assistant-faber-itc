@@ -11,12 +11,6 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
-    STATUS_ON,
-    STATUS_OFF,
-    STATUS_DUAL_BURNER,
-    BURNER_ON_MASK,
-    BURNER_DUAL_MASK,
-    BURNER_OFF_MASK,
     INTENSITY_LEVELS,
 )
 
@@ -69,9 +63,9 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
     def hvac_mode(self):
         if not self.coordinator.data:
             return HVACMode.OFF
-        status = self.coordinator.data.get("status_main", 0)
-        # Broad matching for status
-        if (status & 0xFFFF) in [0x1040, 0x1080]:
+        state = self.coordinator.data.get("state", 0)
+        # 0x01 is often "on/ignited" in many ITC versions, 0x00 is off
+        if state > 0:
             return HVACMode.HEAT
         return HVACMode.OFF
 
@@ -79,8 +73,8 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
     def target_temperature(self):
         if not self.coordinator.data:
             return 0.0
-        intensity_val = self.coordinator.data.get("intensity", 0)
-        # Best match for intensity
+        intensity_val = self.coordinator.data.get("flame_height", 0)
+        # Best match for intensity/flame height
         closest_lvl = 0
         min_diff = 999
         for lvl, val in INTENSITY_LEVELS.items():
@@ -94,8 +88,9 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
     def preset_mode(self):
         if not self.coordinator.data:
             return PRESET_NONE
-        status = self.coordinator.data.get("status_main", 0)
-        if (status & 0xFFFF) == 0x1080:
+        # flame_width 1 usually means dual burner / wide
+        width = self.coordinator.data.get("flame_width", 0)
+        if width > 0:
             return PRESET_BOOST
         return PRESET_NONE
 
@@ -104,8 +99,8 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
         if not self.coordinator.data:
             return {}
             
-        intensity_val = self.coordinator.data.get("intensity", 0)
-        burner_mask = self.coordinator.data.get("burner_mask")
+        intensity_val = self.coordinator.data.get("flame_height", 0)
+        width = self.coordinator.data.get("flame_width", 0)
         
         level = 0
         for lvl, val in INTENSITY_LEVELS.items():
@@ -113,21 +108,18 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
                 level = lvl
                 break
         
-        burner_text = "Aus"
-        if burner_mask == BURNER_ON_MASK:
-            burner_text = "1 Brenner"
-        elif burner_mask == BURNER_DUAL_MASK:
-            burner_text = "2 Brenner"
+        burner_text = "2 Brenner (Breit)" if width > 0 else "1 Brenner (Schmal)"
+        if self.hvac_mode == HVACMode.OFF:
+            burner_text = "Aus"
             
-        status_description = f"{burner_text}, Stufe {level}" if level > 0 else burner_text
+        status_description = f"{burner_text}, Flammenhöhe Stufe {level}" if level > 0 else burner_text
         
         attrs = {
             "status_description": status_description,
-            "burner_mask": hex(burner_mask) if burner_mask is not None else None,
-            "intensity_raw": intensity_val,
+            "flame_width_raw": width,
+            "flame_height_raw": intensity_val,
             "serial_number": self.coordinator.data.get("serial"),
             "model_name": self.coordinator.data.get("model"),
-            "raw_words": self.coordinator.data.get("raw_words", []),
         }
         
         # Merge mined raw sensors into attributes
@@ -138,28 +130,25 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode):
         if hvac_mode == HVACMode.HEAT:
-            await self._client.send_frame(STATUS_ON, 1, BURNER_ON_MASK)
+            await self._client.turn_on()
         else:
-            await self._client.send_frame(STATUS_OFF, 0, BURNER_OFF_MASK)
+            await self._client.turn_off()
         # Non-blocking refresh to avoid UI lag and race conditions
         self.hass.async_create_task(self.coordinator.async_request_refresh())
 
     async def async_set_temperature(self, **kwargs):
-        temp = int(kwargs.get("temperature", 1))
-        current_mask = self.coordinator.data.get("burner_mask", BURNER_ON_MASK) if self.coordinator.data else BURNER_ON_MASK
-        current_status = self.coordinator.data.get("status_main", STATUS_ON) if self.coordinator.data else STATUS_ON
+        level_idx = int(kwargs.get("temperature", 1))
+        # Map 0-4 to protocol values (0x00, 0x19, etc.)
+        protocol_value = INTENSITY_LEVELS.get(level_idx, 0x19)
         
-        await self._client.send_frame(current_status, temp, current_mask)
+        await self._client.set_flame_height(protocol_value)
         self.hass.async_create_task(self.coordinator.async_request_refresh())
 
     async def async_set_preset_mode(self, preset_mode):
-        intensity = int(self.target_temperature)
-        if intensity == 0: intensity = 1
-        
         if preset_mode == PRESET_BOOST:
-            await self._client.send_frame(STATUS_DUAL_BURNER, intensity, BURNER_DUAL_MASK)
+            await self._client.set_flame_width(True)
         else:
-            await self._client.send_frame(STATUS_ON, intensity, BURNER_ON_MASK)
+            await self._client.set_flame_width(False)
         self.hass.async_create_task(self.coordinator.async_request_refresh())
 
     async def async_turn_on(self):
