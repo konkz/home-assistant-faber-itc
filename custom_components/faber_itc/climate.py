@@ -31,6 +31,11 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_fireplace_entity"
 
+        # Optimistic UI states
+        self._ovr_hvac_mode = None
+        self._ovr_target_temp = None
+        self._ovr_preset_mode = None
+
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
         self._attr_preset_modes = [PRESET_NONE, PRESET_BOOST]
@@ -61,19 +66,24 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
 
     @property
     def hvac_mode(self):
+        if self._ovr_hvac_mode is not None:
+            return self._ovr_hvac_mode
         if not self.coordinator.data:
             return HVACMode.OFF
         state = self.coordinator.data.get("state", 0)
-        # 0x01 is often "on/ignited" in many ITC versions, 0x00 is off
+        _LOGGER.debug("Climate UI hvac_mode read state: %s", state)
         if state > 0:
             return HVACMode.HEAT
         return HVACMode.OFF
 
     @property
     def target_temperature(self):
+        if self._ovr_target_temp is not None:
+            return self._ovr_target_temp
         if not self.coordinator.data:
             return 0.0
         intensity_val = self.coordinator.data.get("flame_height", 0)
+        _LOGGER.debug("Climate UI target_temp read flame_height: %s", intensity_val)
         # Best match for intensity/flame height
         closest_lvl = 0
         min_diff = 999
@@ -86,10 +96,13 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
 
     @property
     def preset_mode(self):
+        if self._ovr_preset_mode is not None:
+            return self._ovr_preset_mode
         if not self.coordinator.data:
             return PRESET_NONE
         # flame_width 1 usually means dual burner / wide
         width = self.coordinator.data.get("flame_width", 0)
+        _LOGGER.debug("Climate UI preset_mode read flame_width: %s", width)
         if width > 0:
             return PRESET_BOOST
         return PRESET_NONE
@@ -129,27 +142,45 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
         return attrs
 
     async def async_set_hvac_mode(self, hvac_mode):
+        _LOGGER.info("Climate UI: Set HVAC Mode to %s (Optimistic)", hvac_mode)
+        self._ovr_hvac_mode = hvac_mode
+        self.async_write_ha_state()
+        
         if hvac_mode == HVACMode.HEAT:
             await self._client.turn_on()
         else:
             await self._client.turn_off()
-        # Non-blocking refresh to avoid UI lag and race conditions
-        self.hass.async_create_task(self.coordinator.async_request_refresh())
+            
+        await asyncio.sleep(2)
+        self._ovr_hvac_mode = None
+        await self.coordinator.async_request_refresh()
 
     async def async_set_temperature(self, **kwargs):
         level_idx = int(kwargs.get("temperature", 1))
-        # Map 0-4 to protocol values (0x00, 0x19, etc.)
+        _LOGGER.info("Climate UI: Set Flame Level to %s (Optimistic)", level_idx)
+        self._ovr_target_temp = float(level_idx)
+        self.async_write_ha_state()
+
         protocol_value = INTENSITY_LEVELS.get(level_idx, 0x19)
-        
         await self._client.set_flame_height(protocol_value)
-        self.hass.async_create_task(self.coordinator.async_request_refresh())
+        
+        await asyncio.sleep(2)
+        self._ovr_target_temp = None
+        await self.coordinator.async_request_refresh()
 
     async def async_set_preset_mode(self, preset_mode):
+        _LOGGER.info("Climate UI: Set Preset Mode to %s (Optimistic)", preset_mode)
+        self._ovr_preset_mode = preset_mode
+        self.async_write_ha_state()
+
         if preset_mode == PRESET_BOOST:
             await self._client.set_flame_width(True)
         else:
             await self._client.set_flame_width(False)
-        self.hass.async_create_task(self.coordinator.async_request_refresh())
+            
+        await asyncio.sleep(2)
+        self._ovr_preset_mode = None
+        await self.coordinator.async_request_refresh()
 
     async def async_turn_on(self):
         await self.async_set_hvac_mode(HVACMode.HEAT)
