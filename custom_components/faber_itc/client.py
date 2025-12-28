@@ -1,32 +1,30 @@
 import asyncio
 import logging
 import struct
-import traceback
 import re
-from .const import (
-    DEFAULT_PORT,
-    MAGIC_START,
-    MAGIC_END,
-    INTENSITY_LEVELS,
-    STATUS_OFF,
-    STATUS_ON,
-    STATUS_DUAL_BURNER,
-    BURNER_OFF_MASK,
-    BURNER_ON_MASK,
-    BURNER_DUAL_MASK,
-)
 
 _LOGGER = logging.getLogger(__name__)
 
 TCP_TIMEOUT = 10.0
-WATCHDOG_TIMEOUT = 120.0 # Reconnect if no data for 2 mins
-DEVICE_ID = 0x00007DED
+WATCHDOG_TIMEOUT = 120.0
 
-MAGIC_START_BYTES = struct.pack(">I", MAGIC_START)
-MAGIC_END_BYTES = b"\xFA\xFB\xFC\xFD"
+# Protocol constants based on refined analysis
+MAGIC_START = b"\xA1\xA2\xA3\xA4"
+MAGIC_END = b"\xFA\xFB\xFC\xFD"
+PROTO_HEADER = b"\x00\xFA\x00\x02"
+SENDER_ID = b"\x00\x00\x7D\xED"  # Client ID
+
+# Opcodes (Base)
+OP_IDENTIFY = 0x0020
+OP_INFO_410 = 0x0410
+OP_INFO_420 = 0x0420
+OP_INFO_1010 = 0x1010
+OP_STATUS = 0x1030
+OP_CONTROL = 0x1040
+OP_HEARTBEAT = 0x1080
 
 class FaberITCClient:
-    def __init__(self, host, port=DEFAULT_PORT):
+    def __init__(self, host, port=10001):
         self.host = host
         self.port = port
         self._lock = asyncio.Lock()
@@ -39,38 +37,32 @@ class FaberITCClient:
             "model": "Faber ITC Fireplace",
             "manufacturer": "Faber",
             "serial": None,
-            "fam": None
         }
-        self.last_status = None
-        self._last_full_frame_words = [0] * 32  # Extended cache for sensor mining
-        self._last_command_time = 0
+        self.last_status = {
+            "state": 0,
+            "flame_height": 0,
+            "flame_width": 0,
+            "temp": 0.0,
+        }
 
     def set_callback(self, callback):
         """Set callback for status updates."""
         self._callback = callback
 
     async def connect(self):
-        """Establish a long-lived connection with handshake."""
+        """Establish connection and start read loop."""
         async with self._lock:
             if self._writer:
                 return True
             
             try:
-                _LOGGER.warning("Connecting to %s:%s", self.host, self.port)
+                _LOGGER.debug("Connecting to %s:%s", self.host, self.port)
                 self._reader, self._writer = await asyncio.wait_for(
                     asyncio.open_connection(self.host, self.port), timeout=TCP_TIMEOUT
                 )
                 
-                # Discovery Frame (Exakt 29 Bytes)
-                discovery_payload = (
-                    struct.pack(">4I", MAGIC_START, 0x00FA0002, 0, 0x20)
-                    + b"\x00" * 9
-                    + MAGIC_END_BYTES
-                )
-                
-                _LOGGER.warning("Sending Discovery (29 bytes) to %s", self.host)
-                self._writer.write(discovery_payload)
-                await self._writer.drain()
+                # Discovery / Handshake
+                await self._send_frame(OP_IDENTIFY, b"\x00" * 9)
                 
                 # Start background read loop
                 if self._read_task:
@@ -78,7 +70,7 @@ class FaberITCClient:
                 self._read_task = asyncio.create_task(self._read_loop())
                 self._last_data_time = asyncio.get_event_loop().time()
                 
-                _LOGGER.warning("Long-lived connection established to %s", self.host)
+                _LOGGER.info("Connected to Faber ITC at %s", self.host)
                 return True
             except Exception as e:
                 _LOGGER.error("Connection failed: %s", e)
@@ -86,7 +78,7 @@ class FaberITCClient:
                 return False
 
     async def disconnect(self):
-        """Close connection and cleanup."""
+        """Close connection."""
         async with self._lock:
             if self._read_task:
                 self._read_task.cancel()
@@ -95,14 +87,30 @@ class FaberITCClient:
                 try:
                     self._writer.close()
                     await self._writer.wait_closed()
-                except Exception as e:
-                    _LOGGER.debug("Error closing writer: %s", e)
+                except:
+                    pass
                 finally:
                     self._writer = None
             self._reader = None
 
+    async def _send_frame(self, opcode: int, payload: bytes):
+        """Build and send a protocol frame."""
+        # Opcode is 4 bytes Big Endian
+        frame = (
+            MAGIC_START
+            + PROTO_HEADER
+            + SENDER_ID
+            + struct.pack(">I", opcode)
+            + payload
+            + MAGIC_END
+        )
+        if self._writer:
+            self._writer.write(frame)
+            await self._writer.drain()
+            _LOGGER.debug("Sent Opcode 0x%08X, Payload: %s", opcode, payload.hex())
+
     async def _read_loop(self):
-        """Background loop to continuously empty the socket buffer."""
+        """Background loop to process incoming frames."""
         buffer = b""
         try:
             while True:
@@ -115,23 +123,18 @@ class FaberITCClient:
                 buffer += chunk
 
                 while True:
-                    start_idx = buffer.find(MAGIC_START_BYTES)
+                    start_idx = buffer.find(MAGIC_START)
                     if start_idx == -1:
                         buffer = buffer[-3:]
                         break
 
-                    end_idx = buffer.find(MAGIC_END_BYTES, start_idx)
+                    end_idx = buffer.find(MAGIC_END, start_idx)
                     if end_idx == -1:
                         break
 
-                    frame_data = buffer[start_idx : end_idx + 4]
+                    frame = buffer[start_idx : end_idx + 4]
                     buffer = buffer[end_idx + 4:]
-                    _LOGGER.warning(
-                        "Received frame (%d bytes): %s",
-                        len(frame_data),
-                        frame_data.hex().upper(),
-                    )
-                    self._handle_frame(frame_data)
+                    self._handle_frame(frame)
                     
         except asyncio.CancelledError:
             pass
@@ -140,85 +143,83 @@ class FaberITCClient:
         finally:
             asyncio.create_task(self.disconnect())
 
-    def _handle_frame(self, data):
-        """Parse received frames, store state words and trigger callbacks."""
-        if len(data) > 60:
-            self._parse_ascii_info(data)
-
-        num_words = len(data) // 4
-        if num_words < 7:
+    def _handle_frame(self, data: bytes):
+        """Parse received frames."""
+        # Header(16) | Opcode(4) | Payload(var) | End(4)
+        if len(data) < 24:
             return
 
-        current_words = [
-            struct.unpack(">I", data[i : i + 4])[0] for i in range(0, (num_words * 4), 4)
-        ]
+        opcode_raw = struct.unpack(">I", data[16:20])[0]
+        opcode_base = opcode_raw & 0x0FFFFFFF
+        payload = data[20:-4]
 
-        # Update cache (first 32 words if available)
-        for i in range(min(len(current_words), 32)):
-            self._last_full_frame_words[i] = current_words[i]
-
-        status_main = current_words[3] & 0xFFFFFFFF
-        # Valid states: OFF (0x1030), ON (0x1040), DUAL (0x1080)
-        # Note: We use mask and broad match to be sure
-        if (status_main & 0xFFFF) in [0x1030, 0x1040, 0x1080]:
-            # Ignore incoming intensity 0 for 2 seconds after a command was sent
-            # to prevent flickering if the fireplace sends an intermediate "empty" status.
-            now = asyncio.get_event_loop().time()
-            if now - self._last_command_time < 2.0:
-                intensity = 0
-                if len(current_words) >= 6:
-                    intensity = current_words[5]
-                elif len(current_words) >= 5:
-                    intensity = current_words[4]
+        if opcode_base == OP_STATUS:
+            if len(payload) >= 41:
+                # Based on refined analysis:
+                state = payload[11]
+                flame = payload[15]
+                width = payload[16]
+                temp_raw = payload[21]
                 
-                if intensity == 0 and self.last_status and self.last_status["intensity"] > 0:
-                    _LOGGER.debug("Ignoring intensity 0 shortly after command (Anti-Flicker)")
-                    return
-            # Intensity might be in word 5 (command style) or word 4 (some status styles)
-            intensity = 0
-            if len(current_words) >= 6:
-                intensity = current_words[5]
-            elif len(current_words) >= 5:
-                intensity = current_words[4]
-            
-            # Extract burner mask if available (usually word index 11)
-            burner_mask = BURNER_OFF_MASK
-            if len(current_words) >= 12:
-                burner_mask = current_words[11]
-            elif status_main == STATUS_ON:
-                burner_mask = BURNER_ON_MASK
+                self.last_status.update({
+                    "state": state,
+                    "flame_height": flame,
+                    "flame_width": width,
+                    "temp": temp_raw / 10.0,
+                })
+                
+                _LOGGER.debug("Status: %s", self.last_status)
+                if self._callback:
+                    self._callback(self.last_status)
+        
+        elif opcode_base in [OP_IDENTIFY, OP_INFO_410, OP_INFO_1010]:
+            self._parse_ascii_info(payload)
 
-            # Sensor Mining: All words from index 6 onwards are potential sensors
-            raw_sensors = {}
-            for i in range(6, len(current_words)):
-                raw_sensors[f"word_{i}"] = hex(current_words[i])
-
-            self.last_status = {
-                "status_main": status_main,
-                "intensity": intensity,
-                "burner_mask": burner_mask,
-                "model": self.device_info["model"],
-                "manufacturer": self.device_info["manufacturer"],
-                "serial": self.device_info["serial"],
-                "raw_sensors": raw_sensors,
-                "raw_words": [hex(w) for w in current_words],
-            }
-
-            if self._callback:
-                self._callback(self.last_status)
-
-    def _parse_ascii_info(self, data):
-        """Extract metadata from frames."""
-        strings = re.findall(b"[ -~]{3,}", data)
+    def _parse_ascii_info(self, payload):
+        """Extract device metadata from payload."""
+        strings = re.findall(b"[ -~]{3,}", payload)
         for s in strings:
             try:
                 text = s.decode("ascii").strip("\x00").strip()
                 if not text: continue
                 if text == "Faber": self.device_info["manufacturer"] = text
                 elif text.startswith("M") and len(text) >= 8: self.device_info["serial"] = text
-                elif "Aspect" in text or "Premium" in text: self.device_info["model"] = text
-                elif text in ["ASG", "FAM"]: self.device_info["fam"] = text
+                elif any(x in text for x in ["Aspect", "Premium", "MatriX"]): 
+                    self.device_info["model"] = text
             except: continue
+
+    async def _send_control(self, param_id: int, value: int):
+        """Helper to send 1040 control commands."""
+        # Structure: FF FF | param_id(BE) | 00 00 00 | value(LE)
+        payload = (
+            b"\xFF\xFF"
+            + struct.pack(">H", param_id)
+            + b"\x00\x00\x00"
+            + struct.pack("<H", value)
+        )
+        await self._send_frame(OP_CONTROL, payload)
+
+    async def turn_on(self):
+        """Send ignition sequence."""
+        _LOGGER.info("Sending Turn On sequence")
+        await self._send_control(0x0002, 0)
+        await asyncio.sleep(0.1)
+        await self._send_control(0x0020, 0)
+
+    async def turn_off(self):
+        """Send power off command."""
+        _LOGGER.info("Sending Turn Off command")
+        await self._send_control(0x0001, 0)
+
+    async def set_flame_height(self, level: int):
+        """Set flame level (0x00, 0x19, 0x32, 0x4B, 0x64)."""
+        _LOGGER.info("Setting flame level to %s", hex(level))
+        await self._send_control(0x0009, level)
+
+    async def set_flame_width(self, wide: bool):
+        """Toggle flame width."""
+        _LOGGER.info("Setting flame width to %s", "wide" if wide else "narrow")
+        await self._send_control(0x0005, 0)
 
     async def fetch_data(self):
         """Watchdog check and return latest cached status."""
@@ -229,67 +230,3 @@ class FaberITCClient:
 
         await self.connect()
         return self.last_status
-
-    async def send_frame(self, status_main, intensity, burner_mask):
-        """Send command using stateful 29-byte structure and dynamic flags."""
-        if not await self.connect():
-            raise ConnectionError("Not connected")
-
-        intensity_val = INTENSITY_LEVELS.get(intensity, 0)
-
-        # Build 29-byte Command Frame (7 Words: 28 Bytes + 1 Byte Padding/Trailer Part)
-        # We use a fixed structure like the discovery frame to be safe.
-        # Word 0: MAGIC
-        # Word 1: Version
-        # Word 2: Device ID
-        # Word 3: Status
-        # Bytes 16-19: Flags
-        # Bytes 20-23: Intensity
-        # Byte 24: 0x00 (Padding)
-        # Bytes 25-28: Trailer
-
-        flags = 0x00000000
-        if status_main != STATUS_OFF:
-            # Try to get flags from cache (Word 4)
-            if (
-                len(self._last_full_frame_words) > 4
-                and self._last_full_frame_words[4] != 0
-            ):
-                flags = self._last_full_frame_words[4]
-            else:
-                flags = 0xFFFF0009
-
-        # Construct 29-byte payload exaclty like discovery
-        payload = (
-            struct.pack(">4I", MAGIC_START, 0x00FA0002, DEVICE_ID, status_main)
-            + struct.pack(">I", flags)
-            + struct.pack(">I", intensity_val)
-            + b"\x00"
-            + MAGIC_END_BYTES
-        )
-
-        _LOGGER.warning(
-            "Sending Smart-Command (29 bytes): %s (Flags: %s, Intensity: %d)",
-            payload.hex().upper(),
-            hex(flags),
-            intensity_val,
-        )
-
-        async with self._lock:
-            try:
-                self._writer.write(payload)
-                await self._writer.drain()
-                
-                # Optimistic Update: Immediately reflect the desired state in last_status
-                # to prevent the coordinator from reading old data on the next refresh.
-                if self.last_status:
-                    self.last_status["status_main"] = status_main
-                    self.last_status["intensity"] = intensity_val
-                    self.last_status["burner_mask"] = burner_mask
-                
-                self._last_command_time = asyncio.get_event_loop().time()
-                return True
-            except Exception as e:
-                _LOGGER.error("Failed to send command: %s", e)
-                await self.disconnect()
-                return False
