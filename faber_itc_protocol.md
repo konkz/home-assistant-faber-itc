@@ -1,92 +1,80 @@
 # Faber ITC – Reverse Engineered Protokoll (Aspect Premium RD L / M4435200)
 
 Stand: Dezember 2025  
-Quelle: Mitschnitte einer Faber ITC App ↔ Kamin‑Kommunikation (Wireshark/RVI)  
+Quelle: Mitschnitte einer Faber ITC App ↔ Kamin‑Kommunikation (Wireshark/RVI) & Unabhängige Analyse  
 Gerät: Aspect Premium RD L, Article No M4435200, FAM ASG
 
 ---
 
-## 1. Transport und Rahmenbedingungen
+## 1. Frame-Format (Allgemein)
 
-- **Protokoll:** Proprietär, binär, über **TCP**.
-- **Richtung:** Kommunikation zwischen iOS‑App und ITC‑Modul im LAN (kein Cloud‑Hop im Protokoll selbst).
-- **Endianness:** Alle Felder, die wie Integer aussehen, sind **Big Endian 32‑Bit‑Wörter** (8 Hex‑Zeichen).
-- **Frames:**
-  - Start‑Magic: `A1A2A3A4`
-  - Ende: `FAFBFCFD`
-  - Dazwischen Folge von 32‑Bit‑Wörtern und Padding-Bytes.
+Alle Nachrichten folgen einem festen Paket-Aufbau von mindestens 24 Bytes.
 
----
+| Bereich | Länge | Wert / Beschreibung |
+| :--- | :--- | :--- |
+| **Magic Start** | 4 Bytes | `A1 A2 A3 A4` |
+| **Protokoll-Header** | 4 Bytes | `00 FA 00 02` (Version & Konstante) |
+| **Sender-ID** | 4 Bytes | Client: `00 00 7D ED`, Server: `FA C4 2C D8` |
+| **Opcode** | 4 Bytes | Big-Endian (siehe Opcodes) |
+| **Payload** | Variabel | Dateninhalt |
+| **Magic End** | 4 Bytes | `FA FB FC FD` |
 
-## 2. Discovery-Phase (Handshake)
-
-Bevor Befehle akzeptiert werden, muss eine Discovery-Sequenz erfolgen.
-
-### 2.1 Discovery-Frame (Client -> Kamin)
-- **Größe:** Exakt 29 Bytes
-- **Struktur:**
-  - 0–3: `A1A2A3A4` (Magic Header)
-  - 4–7: `00FA0002` (Protokollversion)
-  - 8–11: `00000000` (Wildcard ID 0)
-  - 12–15: `00000020` (Discovery-Befehl)
-  - 16–24: `000000000000000000` (9 Bytes Padding/Nullen)
-  - 25–28: `FAFBFCFD` (Trailer)
-
-### 2.2 Info-Response (Kamin -> Client)
-- **Größe:** Variabel (oft ca. 125 Bytes)
-- **Zweck:** Gerät meldet Modellname, Artikelnummer, FAM-Code etc. als ASCII-Strings im Payload.
-- **Wichtig:** Muss bis zum Trailer `FAFBFCFD` gelesen werden, um den Socket-Buffer zu leeren.
+### 1.1 Opcode-Logik
+Der Opcode ist ein 32-Bit-Wert.
+- **Anfragen (Requests):** Bit 28 ist `0` (z.B. `00 00 10 30`).
+- **Antworten (Responses):** Bit 28 ist `1` (z.B. `10 00 10 30`).
+- **Basis-Opcode:** `opcode & 0x0FFFFFFF`.
 
 ---
 
-## 3. Command-Phase (Steuerung)
+## 2. Wichtige Opcodes
 
-### 3.1 Command-Frame (Client -> Kamin)
-- **Größe:** Exakt 29 Bytes
-- **Struktur:**
-  - 0–3: `A1A2A3A4` (Magic Header)
-  - 4–7: `00FA0002` (Protokollversion)
-  - 8–11: `00007DED` (Geräte-ID)
-  - 12–15: `STATUS_MAIN` (0x1030 Off, 0x1040 On, 0x1080 2-Burner)
-  - 16–19: `FLAGS` (0xFFFF0009 Normal, 0x00000000 Off)
-  - 20–23: `INTENSITY` (0, 25, 50, 75, 100 als 32-bit Int)
-  - 24: `00` (1 Byte Padding)
-  - 25–28: `FAFBFCFD` (Trailer)
+| Opcode (Base) | Funktion |
+| :--- | :--- |
+| `0x0020` | **Identify/Handshake**: Initialisierung der Verbindung. |
+| `0x0410` / `0x1010` | **Device Info**: Liefert Modellname, Seriennummer etc. als ASCII. |
+| `0x1030` | **Telemetry**: Kern-Status (Zustand, Flamme, Temp). |
+| `0x1040` | **Control**: Senden von Steuerbefehlen. |
+| `0x1080` | **Heartbeat**: Regelmäßige Bestätigung der Verbindung. |
 
 ---
 
-## 4. Telemetrie und Status
+## 3. Telemetrie (Status-Frame 1030)
 
-### 4.1 Status-Update (Kamin -> Client)
-- **Größe:** Variabel (häufig 61 Bytes)
-- **Struktur:** Ähnlich Command-Frame, enthält nach Wort 5 jedoch Sensorwerte (Temperatur, Timer, etc.).
-- **Parsing:**
-  - Wort 3 (Byte 12-15): Aktueller Betriebsmodus (`STATUS_MAIN`)
-  - Wort 5 (Byte 20-23): Aktuelle Flammenintensität (`INTENSITY`)
+Die Response auf `1030` enthält eine 41-Byte Payload. Die Werte liegen an festen Offsets:
 
----
-
-## 5. Bedeutungen der Felder (Zusammenfassung)
-
-### 5.1 STATUS_MAIN (Wort 3)
-| Wert | Bedeutung |
-|------|-----------|
-| `00001030` | Standby / Feuer aus |
-| `00001040` | Feuer an (1 Brenner) |
-| `00001080` | Feuer an (2 Brenner Profil) |
-
-### 5.2 INTENSITY (Wort 5)
-| Stufe | Prozent | Hex (32-bit) |
-|-------|---------|--------------|
-| 0 | 0% | `00000000` |
-| 1 | 25% | `00000019` |
-| 2 | 50% | `00000032` |
-| 3 | 75% | `0000004B` |
-| 4 | 100% | `00000064` |
+| Offset (Payload) | Bedeutung | Werte / Kodierung |
+| :--- | :--- | :--- |
+| **11** | Kamin-Status | `00`: Aus, `01`: An, `04`: Zündvorgang, `05`: Aus-Vorgang |
+| **15** | Flammenhöhe | `00`, `19` (1), `32` (2), `4B` (3), `64` (4) |
+| **16** | Flammenbreite | `32`: Schmal, `64`: Breit |
+| **21** | Raumtemperatur | Hex-Wert / 10 (z.B. `F3` = 243 = 24.3°C) |
 
 ---
 
-## 6. Sicherheitsaspekte
-- ITC-Module erlauben meist nur **eine aktive TCP-Verbindung**.
-- Befehle ohne Discovery-Handshake werden ignoriert.
-- Ungültige Frame-Längen führen zum Verbindungsabbruch durch den Kamin.
+## 4. Steuerung (Control-Frame 1040)
+
+Anfragen zur Steuerung nutzen eine 9-Byte Payload mit folgendem Aufbau:
+`FF FF` | `Param_ID (2B BE)` | `00 00 00` | `Value (2B LE)`
+
+**Wichtig:** Der Wert (`Value`) wird im Gegensatz zu den IDs in **Little-Endian** übertragen.
+
+| Aktion | Param_ID | Value (LE) |
+| :--- | :--- | :--- |
+| **Ausschalten** | `00 01` | `00 00` |
+| **Zündung (Teil 1)** | `00 02` | `00 00` |
+| **Zündung (Teil 2)** | `00 20` | `00 00` |
+| **Breite umschalten** | `00 05` | `00 00` |
+| **Flammenhöhe setzen** | `00 09` | `19 00`, `32 00`, `4B 00`, `64 00` |
+
+### 4.1 Zündsequenz (Power On)
+Um den Kamin einzuschalten, müssen zwei Befehle kurz hintereinander gesendet werden:
+1. `1040` mit Param `0x0002`
+2. `1040` mit Param `0x0020`
+
+---
+
+## 5. Hinweise zur Implementierung
+- **Endianness:** IDs und Opcodes sind Big-Endian, Stellwerte (Level) sind Little-Endian.
+- **Keep-Alive:** Regelmäßiges Polling von `1030` oder Senden von `1080` wird empfohlen.
+- **Socket:** Nur eine aktive TCP-Verbindung pro ITC-Modul zulässig.
