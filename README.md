@@ -5,6 +5,7 @@ Steuere deinen Faber Gaskamin mit ITC-Modul lokal über Home Assistant. Diese In
 ---
 
 ### 🚀 Features
+- **TCP Port:** Standardmäßig wird Port **58779** verwendet.
 - **Power & Status:** Kamin an-/ausschalten inkl. Anzeige des Zündvorgangs.
 - **Flammenhöhe:** Präzise Steuerung in 5 Stufen (Aus, 1-4).
 - **Flammenbreite:** Umschalten zwischen schmalem und breitem Flammenbild (1 oder 2 Brenner).

@@ -2,20 +2,33 @@ DOMAIN = "faber_itc"
 DEFAULT_PORT = 58779
 CONF_HOST = "host"
 
-# Magic Words
-MAGIC_START = 0xA1A2A3A4
-MAGIC_END = 0xFAFBFCFD
+# Protocol Markers
+MAGIC_START = b"\xA1\xA2\xA3\xA4"
+MAGIC_END = b"\xFA\xFB\xFC\xFD"
+PROTO_HEADER = b"\x00\xFA\x00\x02"
+SENDER_ID = b"\x00\x00\x7D\xED"
 
-# Grobe Zustände
-STATUS_OFF = 0x00001030
-STATUS_ON = 0x00001040
-STATUS_DUAL_BURNER = 0x00001080
+# Opcodes (Base)
+OP_IDENTIFY = 0x0020
+OP_INFO_410 = 0x0410
+OP_INFO_420 = 0x0420
+OP_INFO_1010 = 0x1010
+OP_STATUS = 0x1030
+OP_CONTROL = 0x1040
+OP_HEARTBEAT = 0x1080
 
-BURNER_OFF_MASK = 0x30000000
-BURNER_ON_MASK = 0x40000000
-BURNER_DUAL_MASK = 0x80000000
+# Kamin-Status (Payload Offset 11)
+STATE_OFF = 0x00
+STATE_ON = 0x01
+STATE_IGNITING = 0x04
+STATE_SHUTTING_DOWN = 0x05
 
-# Intensitäts-Level
+# Flammenbreite (Payload Offset 16)
+# Laut Doku: 32 (0x20) = Schmal, 64 (0x40) = Breit
+WIDTH_NARROW = 0x20
+WIDTH_WIDE = 0x40
+
+# Intensitäts-Level (Payload Offset 15)
 INTENSITY_LEVELS = {
     0: 0x00,
     1: 0x19,

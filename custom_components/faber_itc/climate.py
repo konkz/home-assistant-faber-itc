@@ -13,6 +13,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     INTENSITY_LEVELS,
+    STATE_OFF,
+    WIDTH_WIDE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -73,9 +75,9 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
             return self._ovr_hvac_mode
         if not self.coordinator.data:
             return HVACMode.OFF
-        state = self.coordinator.data.get("state", 0)
+        state = self.coordinator.data.get("state", STATE_OFF)
         _LOGGER.debug("Climate UI hvac_mode read state: %s", state)
-        if state > 0:
+        if state != STATE_OFF:
             return HVACMode.HEAT
         return HVACMode.OFF
 
@@ -103,10 +105,10 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
             return self._ovr_preset_mode
         if not self.coordinator.data:
             return PRESET_NONE
-        # flame_width 1 usually means dual burner / wide
+        # width >= WIDTH_WIDE (0x40/64) means dual burner / wide
         width = self.coordinator.data.get("flame_width", 0)
         _LOGGER.debug("Climate UI preset_mode read flame_width: %s", width)
-        if width > 0:
+        if width >= WIDTH_WIDE:
             return PRESET_BOOST
         return PRESET_NONE
 
@@ -124,7 +126,7 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
                 level = lvl
                 break
         
-        burner_text = "2 Brenner (Breit)" if width > 0 else "1 Brenner (Schmal)"
+        burner_text = "2 Brenner (Breit)" if width >= WIDTH_WIDE else "1 Brenner (Schmal)"
         if self.hvac_mode == HVACMode.OFF:
             burner_text = "Aus"
             

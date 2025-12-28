@@ -2,29 +2,26 @@ import asyncio
 import logging
 import struct
 import re
+from .const import (
+    DEFAULT_PORT,
+    MAGIC_START,
+    MAGIC_END,
+    PROTO_HEADER,
+    SENDER_ID,
+    OP_IDENTIFY,
+    OP_INFO_410,
+    OP_INFO_1010,
+    OP_STATUS,
+    OP_CONTROL,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 TCP_TIMEOUT = 10.0
 WATCHDOG_TIMEOUT = 120.0
 
-# Protocol constants based on refined analysis
-MAGIC_START = b"\xA1\xA2\xA3\xA4"
-MAGIC_END = b"\xFA\xFB\xFC\xFD"
-PROTO_HEADER = b"\x00\xFA\x00\x02"
-SENDER_ID = b"\x00\x00\x7D\xED"  # Client ID
-
-# Opcodes (Base)
-OP_IDENTIFY = 0x0020
-OP_INFO_410 = 0x0410
-OP_INFO_420 = 0x0420
-OP_INFO_1010 = 0x1010
-OP_STATUS = 0x1030
-OP_CONTROL = 0x1040
-OP_HEARTBEAT = 0x1080
-
 class FaberITCClient:
-    def __init__(self, host, port=10001):
+    def __init__(self, host, port=DEFAULT_PORT):
         self.host = host
         self.port = port
         self._lock = asyncio.Lock()
@@ -70,7 +67,7 @@ class FaberITCClient:
                 self._read_task = asyncio.create_task(self._read_loop())
                 self._last_data_time = asyncio.get_event_loop().time()
                 
-                _LOGGER.info("Connected to Faber ITC at %s", self.host)
+                _LOGGER.info("Connected to Faber ITC at %s:%s", self.host, self.port)
                 return True
             except Exception as e:
                 _LOGGER.error("Connection failed: %s", e)

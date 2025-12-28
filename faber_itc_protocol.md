@@ -8,7 +8,7 @@ Gerät: Aspect Premium RD L, Article No M4435200, FAM ASG
 
 ## 1. Frame-Format (Allgemein)
 
-Alle Nachrichten folgen einem festen Paket-Aufbau von mindestens 24 Bytes.
+Alle Nachrichten folgen einem festen Paket-Aufbau von mindestens 24 Bytes. Standardmäßig wird Port **58779** verwendet.
 
 | Bereich | Länge | Wert / Beschreibung |
 | :--- | :--- | :--- |
