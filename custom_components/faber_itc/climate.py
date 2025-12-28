@@ -18,11 +18,10 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-_LOGGER.info("FABER ITC: Loading climate platform version 0.2.31")
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the Faber ITC climate platform."""
-    _LOGGER.info("FABER ITC: async_setup_entry climate starting")
+    _LOGGER.debug("Setting up climate platform")
     coordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities([FaberFireplace(coordinator, entry)])
 
@@ -114,11 +113,10 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
 
     @property
     def extra_state_attributes(self):
+        """Return device specific state attributes."""
         if not self.coordinator.data:
             return {}
         
-        _LOGGER.warning("FABER ITC: Climate data update: %s", self.coordinator.data)
-            
         intensity_val = self.coordinator.data.get("flame_height", 0)
         width = self.coordinator.data.get("flame_width", 0)
         
@@ -141,10 +139,6 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
             "serial_number": self.coordinator.data.get("serial"),
             "model_name": self.coordinator.data.get("model"),
         }
-        
-        # Merge mined raw sensors into attributes
-        raw_sensors = self.coordinator.data.get("raw_sensors", {})
-        attrs.update(raw_sensors)
         
         return attrs
 

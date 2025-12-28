@@ -49,27 +49,25 @@ class FaberITCClient:
         self._callback = callback
 
     async def connect(self):
-        """Establish connection and start read loop."""
+        """Establish connection."""
         async with self._lock:
             if self._writer:
                 return True
             
             try:
-                _LOGGER.warning("FABER ITC: Attempting connection to %s:%s", self.host, self.port)
+                _LOGGER.debug("Connecting to %s:%s", self.host, self.port)
                 self._reader, self._writer = await asyncio.wait_for(
                     asyncio.open_connection(self.host, self.port), timeout=TCP_TIMEOUT
                 )
                 
-                # Discovery / Handshake
                 await self._send_frame(OP_IDENTIFY, b"\x00" * 9)
 
-                # Start background read loop
                 if self._read_task:
                     self._read_task.cancel()
                 self._read_task = asyncio.create_task(self._read_loop())
                 self._last_data_time = asyncio.get_running_loop().time()
                 
-                _LOGGER.info("Connected to Faber ITC at %s:%s", self.host, self.port)
+                _LOGGER.info("Connected to %s:%s", self.host, self.port)
                 return True
             except Exception as e:
                 _LOGGER.error("Connection failed: %s", e)
@@ -94,7 +92,6 @@ class FaberITCClient:
 
     async def _send_frame(self, opcode: int, payload: bytes):
         """Build and send a protocol frame."""
-        # Opcode is 4 bytes Big Endian
         frame = (
             MAGIC_START
             + PROTO_HEADER
@@ -144,16 +141,13 @@ class FaberITCClient:
 
     def _handle_frame(self, data: bytes):
         """Parse received frames."""
-        # Header(8) | ID(4) | Opcode(4) | Payload(var) | End(4)
         if len(data) < 20:
             return
 
-        sender_id = data[8:12]
         opcode_raw = struct.unpack(">I", data[12:16])[0]
         opcode_base = opcode_raw & 0x0FFFFFFF
         payload = data[16:-4]
 
-        # Payload Structure: Reserved(8) | Length(1) | Data(Length)
         if len(payload) < 9:
             return
             
@@ -161,22 +155,18 @@ class FaberITCClient:
         actual_len = len(payload) - 9
         
         if expected_len != actual_len:
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Payload length mismatch for Opcode 0x%08X: Expected %d, got %d", 
                 opcode_raw, expected_len, actual_len
             )
-            # We still continue for now as it might be a known variation, 
-            # but we logged it.
 
         if opcode_base == OP_STATUS:
-            _LOGGER.debug("FABER ITC: Received 1030 Payload (len=%d): %s", len(payload), payload.hex())
             if len(payload) >= 22:
                 data_part = payload[9:]
-                # Offsets relative to data_part (Payload Offset - 9)
-                state = data_part[2]   # Offset 11
-                flame = data_part[6]   # Offset 15
-                width = data_part[7]   # Offset 16
-                temp_raw = data_part[12] # Offset 21
+                state = data_part[2]
+                flame = data_part[6]
+                width = data_part[7]
+                temp_raw = data_part[12]
                 
                 self.last_status.update({
                     "state": state,
@@ -206,8 +196,7 @@ class FaberITCClient:
             except: continue
 
     async def _send_control(self, param_id: int, value: int):
-        """Helper to send 1040 control commands."""
-        # Structure: FF FF | param_id(BE) | 00 00 00 | value(LE)
+        """Helper to send control commands."""
         payload = (
             b"\xFF\xFF"
             + struct.pack(">H", param_id)
@@ -218,8 +207,6 @@ class FaberITCClient:
 
     async def update(self):
         """Poll for status and send heartbeat."""
-        _LOGGER.debug("FABER ITC: Polling status (1030) and heartbeat (1080)")
-        # Request for 1030 uses 9 bytes payload (as seen in dumps)
         await self._send_frame(OP_STATUS, b"\x00" * 9)
         await asyncio.sleep(0.1)
         await self._send_frame(OP_HEARTBEAT, b"\x00" * 8)
