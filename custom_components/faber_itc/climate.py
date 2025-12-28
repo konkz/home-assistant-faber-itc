@@ -4,8 +4,6 @@ from homeassistant.components.climate import (
     ClimateEntity,
     HVACMode,
     ClimateEntityFeature,
-    PRESET_NONE,
-    PRESET_BOOST,
 )
 from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers.entity import DeviceInfo
@@ -13,6 +11,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     INTENSITY_LEVELS,
+    PRESET_NARROW,
+    PRESET_WIDE,
     STATE_OFF,
     WIDTH_WIDE,
 )
@@ -41,9 +41,9 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
         self._ovr_target_temp = None
         self._ovr_preset_mode = None
 
-        self._attr_temperature_unit = UnitOfTemperature.CELSIUS
+        self._attr_temperature_unit = None
         self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
-        self._attr_preset_modes = [PRESET_NONE, PRESET_BOOST]
+        self._attr_preset_modes = [PRESET_NARROW, PRESET_WIDE]
         self._attr_supported_features = (
             ClimateEntityFeature.TARGET_TEMPERATURE
             | ClimateEntityFeature.TURN_ON
@@ -104,13 +104,13 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
         if self._ovr_preset_mode is not None:
             return self._ovr_preset_mode
         if not self.coordinator.data:
-            return PRESET_NONE
+            return PRESET_NARROW
         # width >= WIDTH_WIDE (0x40/64) means dual burner / wide
         width = self.coordinator.data.get("flame_width", 0)
         _LOGGER.debug("Climate UI preset_mode read flame_width: %s", width)
         if width >= WIDTH_WIDE:
-            return PRESET_BOOST
-        return PRESET_NONE
+            return PRESET_WIDE
+        return PRESET_NARROW
 
     @property
     def extra_state_attributes(self):
@@ -178,7 +178,7 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
         self._ovr_preset_mode = preset_mode
         self.async_write_ha_state()
 
-        if preset_mode == PRESET_BOOST:
+        if preset_mode == PRESET_WIDE:
             await self._client.set_flame_width(True)
         else:
             await self._client.set_flame_width(False)

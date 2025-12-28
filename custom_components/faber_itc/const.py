@@ -35,3 +35,7 @@ INTENSITY_LEVELS = {
     3: 0x4B,
     4: 0x64
 }
+
+# Presets
+PRESET_NARROW = "narrow"
+PRESET_WIDE = "wide"

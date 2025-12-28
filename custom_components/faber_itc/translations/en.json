@@ -21,7 +21,30 @@
   "entity": {
     "climate": {
       "fireplace": {
+        "name": "Flame Control",
+        "state": {
+          "heat": "On",
+          "off": "Off"
+        },
         "state_attributes": {
+          "hvac_action": {
+            "name": "Flame",
+            "state": {
+              "heating": "On",
+              "idle": "Off",
+              "off": "Off"
+            }
+          },
+          "preset_mode": {
+            "name": "Burner",
+            "state": {
+              "narrow": "Narrow",
+              "wide": "Wide"
+            }
+          },
+          "temperature": {
+            "name": "Level"
+          },
           "status_description": {
             "name": "Status Description"
           },
