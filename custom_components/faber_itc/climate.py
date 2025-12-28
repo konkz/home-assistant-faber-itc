@@ -113,6 +113,13 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
         return PRESET_NARROW
 
     @property
+    def preset_icon(self):
+        """Return the icon to use for the current preset mode."""
+        if self.preset_mode == PRESET_WIDE:
+            return "mdi:arrow-expand-horizontal"
+        return "mdi:format-horizontal-align-center"
+
+    @property
     def extra_state_attributes(self):
         """Return device specific state attributes."""
         if not self.coordinator.data:
