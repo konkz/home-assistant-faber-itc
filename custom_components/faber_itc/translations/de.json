@@ -17,5 +17,25 @@
     "abort": {
       "already_configured": "Dieses Gerät ist bereits konfiguriert"
     }
+  },
+  "entity": {
+    "climate": {
+      "fireplace": {
+        "state_attributes": {
+          "status_description": {
+            "name": "Statusbeschreibung"
+          },
+          "flame_width_raw": {
+            "name": "Brennerbreite (Rohwert)"
+          },
+          "flame_height_raw": {
+            "name": "Flammenhöhe (Rohwert)"
+          },
+          "flame_level": {
+            "name": "Flammenstufe"
+          }
+        }
+      }
+    }
   }
 }

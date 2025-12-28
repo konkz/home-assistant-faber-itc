@@ -17,5 +17,25 @@
     "abort": {
       "already_configured": "This device is already configured"
     }
+  },
+  "entity": {
+    "climate": {
+      "fireplace": {
+        "state_attributes": {
+          "status_description": {
+            "name": "Status Description"
+          },
+          "flame_width_raw": {
+            "name": "Burner Width (Raw)"
+          },
+          "flame_height_raw": {
+            "name": "Flame Height (Raw)"
+          },
+          "flame_level": {
+            "name": "Flame Level"
+          }
+        }
+      }
+    }
   }
 }

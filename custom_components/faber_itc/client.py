@@ -112,7 +112,7 @@ class FaberITCClient:
             while True:
                 chunk = await self._reader.read(4096)
                 if not chunk:
-                    _LOGGER.warning("Connection closed by device")
+                    _LOGGER.debug("Connection closed by device")
                     break
 
                 self._last_data_time = asyncio.get_running_loop().time()

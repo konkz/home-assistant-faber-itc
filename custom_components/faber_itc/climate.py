@@ -34,6 +34,7 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
         self._client = coordinator.client
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_fireplace_entity"
+        self._attr_translation_key = "fireplace"
 
         # Optimistic UI states
         self._ovr_hvac_mode = None
@@ -62,7 +63,7 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
         data = self.coordinator.data or {}
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.entry_id)},
-            name="Faber Kamin",
+            name="Faber Fireplace",
             manufacturer=data.get("manufacturer", "Faber"),
             model=data.get("model", "Faber ITC Fireplace"),
             serial_number=data.get("serial"),
@@ -126,16 +127,16 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
                 level = lvl
                 break
         
-        burner_text = "2 Brenner (Breit)" if width >= WIDTH_WIDE else "1 Brenner (Schmal)"
-        if self.hvac_mode == HVACMode.OFF:
-            burner_text = "Aus"
+        # burner_text = "2 Brenner (Breit)" if width >= WIDTH_WIDE else "1 Brenner (Schmal)"
+        # if self.hvac_mode == HVACMode.OFF:
+        #     burner_text = "Aus"
             
-        status_description = f"{burner_text}, Flammenhöhe Stufe {level}" if level > 0 else burner_text
+        # status_description = f"{burner_text}, Flammenhöhe Stufe {level}" if level > 0 else burner_text
         
         attrs = {
-            "status_description": status_description,
             "flame_width_raw": width,
             "flame_height_raw": intensity_val,
+            "flame_level": level,
             "serial_number": self.coordinator.data.get("serial"),
             "model_name": self.coordinator.data.get("model"),
         }
