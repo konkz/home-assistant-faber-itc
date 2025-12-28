@@ -144,18 +144,20 @@ class FaberITCClient:
 
     def _handle_frame(self, data: bytes):
         """Parse received frames."""
-        # Header(16) | Opcode(4) | Payload(var) | End(4)
-        # Minimal frame: Magic(4) + Header(4) + ID(4) + Opcode(4) + End(4) = 20 bytes
+        # Header(8) | ID(4) | Opcode(4) | Payload(var) | End(4)
         if len(data) < 20:
             return
 
-        opcode_raw = struct.unpack(">I", data[16:20])[0]
+        sender_id = data[8:12]
+        opcode_raw = struct.unpack(">I", data[12:16])[0]
         opcode_base = opcode_raw & 0x0FFFFFFF
-        payload = data[20:-4]
+        payload = data[16:-4]
 
         if opcode_base == OP_STATUS:
             _LOGGER.debug("FABER ITC: Received 1030 Payload (len=%d): %s", len(payload), payload.hex())
             if len(payload) >= 22:
+                # payload[0:8] = Reserved/Session
+                # payload[8] = 0x20
                 state = payload[11]
                 flame = payload[15]
                 width = payload[16]
@@ -202,7 +204,8 @@ class FaberITCClient:
     async def update(self):
         """Poll for status and send heartbeat."""
         _LOGGER.debug("FABER ITC: Polling status (1030) and heartbeat (1080)")
-        await self._send_frame(OP_STATUS, b"\x00" * 8)
+        # Request for 1030 uses 9 bytes payload (as seen in dumps)
+        await self._send_frame(OP_STATUS, b"\x00" * 9)
         await asyncio.sleep(0.1)
         await self._send_frame(OP_HEARTBEAT, b"\x00" * 8)
 
