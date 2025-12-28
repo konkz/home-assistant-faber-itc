@@ -66,7 +66,7 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
             name="Faber Kamin",
             manufacturer=data.get("manufacturer", "Faber"),
             model=data.get("model", "Faber ITC Fireplace"),
-            hw_version=data.get("serial"),
+            serial_number=data.get("serial"),
         )
 
     @property
@@ -164,6 +164,9 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
 
     async def async_set_temperature(self, **kwargs):
         level_idx = int(kwargs.get("temperature", 1))
+        # Clamp value to min/max temp
+        level_idx = max(int(self.min_temp), min(int(self.max_temp), level_idx))
+        
         _LOGGER.info("Climate UI: Set Flame Level to %s (Optimistic)", level_idx)
         self._ovr_target_temp = float(level_idx)
         self.async_write_ha_state()

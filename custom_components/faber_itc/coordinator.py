@@ -1,6 +1,7 @@
 from datetime import timedelta
 import logging
 
+from homeassistant.core import callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ class FaberITCUpdateCoordinator(DataUpdateCoordinator):
         # Register callback for event-driven updates from the client's read loop
         self.client.set_callback(self._handle_client_update)
 
+    @callback
     def _handle_client_update(self, data):
         """Handle status update from client read loop."""
         _LOGGER.debug("Coordinator received event-driven update")

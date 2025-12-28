@@ -30,6 +30,7 @@ class FaberITCClient:
         self._read_task = None
         self._callback = None
         self._last_data_time = 0
+        self._reconnect_delay = 1
         self.device_info = {
             "model": "Faber ITC Fireplace",
             "manufacturer": "Faber",
@@ -65,7 +66,7 @@ class FaberITCClient:
                 if self._read_task:
                     self._read_task.cancel()
                 self._read_task = asyncio.create_task(self._read_loop())
-                self._last_data_time = asyncio.get_event_loop().time()
+                self._last_data_time = asyncio.get_running_loop().time()
                 
                 _LOGGER.info("Connected to Faber ITC at %s:%s", self.host, self.port)
                 return True
@@ -116,7 +117,7 @@ class FaberITCClient:
                     _LOGGER.warning("Connection closed by device")
                     break
 
-                self._last_data_time = asyncio.get_event_loop().time()
+                self._last_data_time = asyncio.get_running_loop().time()
                 buffer += chunk
 
                 while True:
@@ -167,7 +168,7 @@ class FaberITCClient:
                 
                 _LOGGER.debug("Status: %s", self.last_status)
                 if self._callback:
-                    self._callback(self.last_status)
+                    self._callback(dict(self.last_status))
         
         elif opcode_base in [OP_IDENTIFY, OP_INFO_410, OP_INFO_1010]:
             self._parse_ascii_info(payload)
@@ -220,10 +221,18 @@ class FaberITCClient:
 
     async def fetch_data(self):
         """Watchdog check and return latest cached status."""
-        now = asyncio.get_event_loop().time()
+        now = asyncio.get_running_loop().time()
         if self._writer and (now - self._last_data_time > WATCHDOG_TIMEOUT):
             _LOGGER.warning("Watchdog: No data for %ss, reconnecting", WATCHDOG_TIMEOUT)
             await self.disconnect()
 
-        await self.connect()
+        if not self._writer:
+            try:
+                await self.connect()
+                self._reconnect_delay = 1
+            except Exception as e:
+                _LOGGER.error("Reconnect failed: %s, retrying later", e)
+                await asyncio.sleep(self._reconnect_delay)
+                self._reconnect_delay = min(self._reconnect_delay * 2, 60)
+
         return self.last_status
