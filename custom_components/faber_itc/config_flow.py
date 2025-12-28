@@ -1,6 +1,7 @@
 import voluptuous as vol
 from homeassistant import config_entries
-from .const import DOMAIN, CONF_HOST
+from .const import DOMAIN, CONF_HOST, DEFAULT_PORT
+from .client import FaberITCClient
 
 class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
@@ -8,8 +9,17 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None):
         errors = {}
         if user_input is not None:
-            # Hier könnte man eine kurze Test-Verbindung einbauen
-            return self.async_create_entry(title=f"Faber Kamin ({user_input[CONF_HOST]})", data=user_input)
+            try:
+                client = FaberITCClient(user_input[CONF_HOST], DEFAULT_PORT)
+                if await client.connect():
+                    await client.disconnect()
+                    return self.async_create_entry(
+                        title=f"Faber Kamin ({user_input[CONF_HOST]})", data=user_input
+                    )
+                errors["base"] = "cannot_connect"
+            except Exception:
+                errors["base"] = "unknown"
+
 
         return self.async_show_form(
             step_id="user",
