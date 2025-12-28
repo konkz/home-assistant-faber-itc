@@ -64,7 +64,8 @@ Anfragen zur Steuerung nutzen eine 9-Byte Payload mit folgendem Aufbau:
 | **Ausschalten** | `00 01` | `00 00` |
 | **Zündung (Teil 1)** | `00 02` | `00 00` |
 | **Zündung (Teil 2)** | `00 20` | `00 00` |
-| **Breite umschalten** | `00 05` | `00 00` |
+| **Schmaler Brenner** | `00 05` | `00 00` |
+| **Breiter Brenner** | `00 06` | `00 00` |
 | **Flammenhöhe setzen** | `00 09` | `19 00`, `32 00`, `4B 00`, `64 00` |
 
 ### 4.1 Zündsequenz (Power On)

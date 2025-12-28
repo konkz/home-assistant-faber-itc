@@ -233,9 +233,10 @@ class FaberITCClient:
         await self.update()
 
     async def set_flame_width(self, wide: bool):
-        """Toggle flame width."""
+        """Toggle flame width. 0x0006 for wide, 0x0005 for narrow."""
         _LOGGER.info("Setting flame width to %s", "wide" if wide else "narrow")
-        await self._send_control(0x0005, 0)
+        param_id = 0x0006 if wide else 0x0005
+        await self._send_control(param_id, 0)
         await asyncio.sleep(0.5)
         await self.update()
 
