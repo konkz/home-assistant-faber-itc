@@ -2,15 +2,15 @@
   "config": {
     "step": {
       "user": {
-        "title": "Faber ITC Fireplace Setup",
-        "description": "Please enter the IP address of your Faber ITC controller. Ensure the fireplace is powered on and connected to your local network. Note: The official Faber app should be completely closed while using Home Assistant.",
+        "title": "Faber ITC Controller Setup",
+        "description": "Please enter the IP address of your Faber ITC controller. Ensure the controller is powered on and connected to your local network.",
         "data": {
           "host": "IP Address"
         }
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to fireplace",
+      "cannot_connect": "Failed to connect to controller",
       "invalid_auth": "Invalid authentication",
       "unknown": "Unexpected error"
     },

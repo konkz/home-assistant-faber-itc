@@ -17,18 +17,17 @@ OP_STATUS = 0x1030
 OP_CONTROL = 0x1040
 OP_HEARTBEAT = 0x1080
 
-# Kamin-Status (Payload Offset 11)
+# Device States
 STATE_OFF = 0x00
 STATE_ON = 0x01
 STATE_IGNITING = 0x04
 STATE_SHUTTING_DOWN = 0x05
 
-# Flammenbreite (Payload Offset 16)
-# Laut Hex-Dump: 32 (0x32 = 50%) = Schmal, 64 (0x64 = 100%) = Breit
+# Burner Width
 WIDTH_NARROW = 0x32
 WIDTH_WIDE = 0x64
 
-# Intensitäts-Level (Payload Offset 15)
+# Intensity Levels
 INTENSITY_LEVELS = {
     0: 0x00,
     1: 0x19,

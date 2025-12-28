@@ -67,10 +67,10 @@ class FaberITCClient:
                 self._read_task = asyncio.create_task(self._read_loop())
                 self._last_data_time = asyncio.get_running_loop().time()
                 
-                _LOGGER.info("Connected to %s:%s", self.host, self.port)
+                _LOGGER.debug("Connected to %s:%s", self.host, self.port)
                 return True
             except Exception as e:
-                _LOGGER.error("Connection failed: %s", e)
+                _LOGGER.debug("Connection failed: %s", e)
                 await self.disconnect()
                 return False
 
@@ -175,7 +175,7 @@ class FaberITCClient:
                     "temp": temp_raw / 10.0,
                 })
                 
-                _LOGGER.debug("FABER ITC: Parsed Status: %s", self.last_status)
+                _LOGGER.debug("Parsed Status: %s", self.last_status)
                 if self._callback:
                     self._callback(dict(self.last_status))
         
@@ -246,7 +246,7 @@ class FaberITCClient:
         """Watchdog check and return latest cached status."""
         now = asyncio.get_running_loop().time()
         if self._writer and (now - self._last_data_time > WATCHDOG_TIMEOUT):
-            _LOGGER.warning("Watchdog: No data for %ss, reconnecting", WATCHDOG_TIMEOUT)
+            _LOGGER.debug("Watchdog: No data for %ss, reconnecting", WATCHDOG_TIMEOUT)
             await self.disconnect()
 
         if not self._writer:
@@ -254,7 +254,7 @@ class FaberITCClient:
                 await self.connect()
                 self._reconnect_delay = 1
             except Exception as e:
-                _LOGGER.error("Reconnect failed: %s, retrying later", e)
+                _LOGGER.debug("Reconnect failed: %s, retrying later", e)
                 await asyncio.sleep(self._reconnect_delay)
                 self._reconnect_delay = min(self._reconnect_delay * 2, 60)
 

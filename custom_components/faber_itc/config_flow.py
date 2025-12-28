@@ -14,7 +14,7 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if await client.connect():
                     await client.disconnect()
                     return self.async_create_entry(
-                        title=f"Faber Kamin ({user_input[CONF_HOST]})", data=user_input
+                        title=f"Faber ITC Controller ({user_input[CONF_HOST]})", data=user_input
                     )
                 errors["base"] = "cannot_connect"
             except Exception:
