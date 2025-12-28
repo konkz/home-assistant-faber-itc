@@ -13,6 +13,7 @@ from .const import (
     OP_INFO_1010,
     OP_STATUS,
     OP_CONTROL,
+    OP_HEARTBEAT,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,7 +62,8 @@ class FaberITCClient:
                 
                 # Discovery / Handshake
                 await self._send_frame(OP_IDENTIFY, b"\x00" * 9)
-                
+                await self.update()
+
                 # Start background read loop
                 if self._read_task:
                     self._read_task.cancel()
@@ -197,27 +199,42 @@ class FaberITCClient:
         )
         await self._send_frame(OP_CONTROL, payload)
 
+    async def update(self):
+        """Poll for status and send heartbeat."""
+        _LOGGER.debug("FABER ITC: Polling status (1030) and heartbeat (1080)")
+        await self._send_frame(OP_STATUS, b"\x00" * 8)
+        await asyncio.sleep(0.1)
+        await self._send_frame(OP_HEARTBEAT, b"\x00" * 8)
+
     async def turn_on(self):
         """Send ignition sequence."""
         _LOGGER.info("Sending Turn On sequence")
         await self._send_control(0x0002, 0)
         await asyncio.sleep(0.1)
         await self._send_control(0x0020, 0)
+        await asyncio.sleep(0.5)
+        await self.update()
 
     async def turn_off(self):
         """Send power off command."""
         _LOGGER.info("Sending Turn Off command")
         await self._send_control(0x0001, 0)
+        await asyncio.sleep(0.5)
+        await self.update()
 
     async def set_flame_height(self, level: int):
         """Set flame level (0x00, 0x19, 0x32, 0x4B, 0x64)."""
         _LOGGER.info("Setting flame level to %s", hex(level))
         await self._send_control(0x0009, level)
+        await asyncio.sleep(0.5)
+        await self.update()
 
     async def set_flame_width(self, wide: bool):
         """Toggle flame width."""
         _LOGGER.info("Setting flame width to %s", "wide" if wide else "narrow")
         await self._send_control(0x0005, 0)
+        await asyncio.sleep(0.5)
+        await self.update()
 
     async def fetch_data(self):
         """Watchdog check and return latest cached status."""

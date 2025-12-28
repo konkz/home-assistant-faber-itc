@@ -16,7 +16,7 @@ class FaberITCUpdateCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name="Faber ITC Status",
-            update_interval=timedelta(seconds=30),
+            update_interval=timedelta(seconds=10),
         )
         
         # Register callback for event-driven updates from the client's read loop
@@ -31,6 +31,8 @@ class FaberITCUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Fetch data from client (Watchdog check)."""
         try:
+            # Trigger active poll
+            await self.client.update()
             # fetch_data now checks the watchdog/connection and returns cached status
             data = await self.client.fetch_data()
             if data is None:
