@@ -24,9 +24,9 @@ STATE_IGNITING = 0x04
 STATE_SHUTTING_DOWN = 0x05
 
 # Flammenbreite (Payload Offset 16)
-# Laut Doku: 32 (0x20) = Schmal, 64 (0x40) = Breit
-WIDTH_NARROW = 0x20
-WIDTH_WIDE = 0x40
+# Laut Hex-Dump: 32 (0x32 = 50%) = Schmal, 64 (0x64 = 100%) = Breit
+WIDTH_NARROW = 0x32
+WIDTH_WIDE = 0x64
 
 # Intensitäts-Level (Payload Offset 15)
 INTENSITY_LEVELS = {
