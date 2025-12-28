@@ -1,4 +1,4 @@
-# <img src="icon.png" width="32" height="32" align="center"> Faber ITC Integration for Home Assistant
+# <img src="https://raw.githubusercontent.com/konkz/home-assistant-faber-itc/main/icon.png" width="32" height="32" align="center"> Faber ITC Integration for Home Assistant
 
 Steuere deinen Faber Gaskamin (ITC-Modul) lokal über Home Assistant. Kein Cloud-Zwang, volle Kontrolle.
 
