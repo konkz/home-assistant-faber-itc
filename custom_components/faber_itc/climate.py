@@ -116,6 +116,8 @@ class FaberFireplace(CoordinatorEntity, ClimateEntity):
     def extra_state_attributes(self):
         if not self.coordinator.data:
             return {}
+        
+        _LOGGER.warning("FABER ITC: Climate data update: %s", self.coordinator.data)
             
         intensity_val = self.coordinator.data.get("flame_height", 0)
         width = self.coordinator.data.get("flame_width", 0)

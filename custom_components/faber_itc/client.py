@@ -53,7 +53,7 @@ class FaberITCClient:
                 return True
             
             try:
-                _LOGGER.debug("Connecting to %s:%s", self.host, self.port)
+                _LOGGER.warning("FABER ITC: Attempting connection to %s:%s", self.host, self.port)
                 self._reader, self._writer = await asyncio.wait_for(
                     asyncio.open_connection(self.host, self.port), timeout=TCP_TIMEOUT
                 )

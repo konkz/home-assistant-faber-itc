@@ -10,7 +10,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Faber ITC from a config entry."""
-    _LOGGER.warning("Setting up Faber ITC integration entry for host: %s", entry.data.get(CONF_HOST))
+    _LOGGER.warning("FABER ITC: async_setup_entry starting for host: %s", entry.data.get(CONF_HOST))
     
     # Registriert den Ordner 'branding' unter dem URL-Pfad '/faber_itc_static'
     await hass.http.async_register_static_paths(
@@ -35,8 +35,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
     
+    _LOGGER.warning("FABER ITC: Forwarding setup to platform: climate")
     await hass.config_entries.async_forward_entry_setups(entry, ["climate"])
-    _LOGGER.warning("Faber ITC integration setup complete (refresh pending in background)")
+    _LOGGER.warning("FABER ITC: async_setup_entry finished successfully")
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
