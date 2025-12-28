@@ -62,7 +62,6 @@ class FaberITCClient:
                 
                 # Discovery / Handshake
                 await self._send_frame(OP_IDENTIFY, b"\x00" * 9)
-                await self.update()
 
                 # Start background read loop
                 if self._read_task:
