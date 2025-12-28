@@ -1,14 +1,15 @@
 # <img src="https://raw.githubusercontent.com/konkz/home-assistant-faber-itc/main/icon.png" width="32" height="32" align="center"> Faber ITC Integration for Home Assistant
 
-Steuere deinen Faber Gaskamin (ITC-Modul) lokal über Home Assistant. Kein Cloud-Zwang, volle Kontrolle.
+Steuere deinen Faber Gaskamin mit ITC-Modul lokal über Home Assistant. Diese Integration nutzt das verifizierte TCP-Protokoll für eine schnelle und zuverlässige Steuerung ohne Cloud-Zwang.
 
 ---
 
 ### 🚀 Features
-- **Power:** Kamin an- und ausschalten.
-- **Flammenhöhe:** Präzise Steuerung in 5 Stufen (0-4).
-- **Brenner-Modi:** Unterstützung für 1- und 2-Brenner Profile.
-- **Lokale Kommunikation:** Schnell und zuverlässig via TCP (Port 58779).
+- **Power & Status:** Kamin an-/ausschalten inkl. Anzeige des Zündvorgangs.
+- **Flammenhöhe:** Präzise Steuerung in 5 Stufen (Aus, 1-4).
+- **Flammenbreite:** Umschalten zwischen schmalem und breitem Flammenbild (1 oder 2 Brenner).
+- **Temperatur:** Auslesen der aktuellen Raumtemperatur direkt vom ITC-Modul.
+- **Echtzeit-Updates:** Sofortige Statusrückmeldung via TCP-Polling.
 
 ---
 
