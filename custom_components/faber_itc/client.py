@@ -145,18 +145,17 @@ class FaberITCClient:
     def _handle_frame(self, data: bytes):
         """Parse received frames."""
         # Header(16) | Opcode(4) | Payload(var) | End(4)
-        if len(data) < 24:
+        # Minimal frame: Magic(4) + Header(4) + ID(4) + Opcode(4) + End(4) = 20 bytes
+        if len(data) < 20:
             return
 
         opcode_raw = struct.unpack(">I", data[16:20])[0]
         opcode_base = opcode_raw & 0x0FFFFFFF
         payload = data[20:-4]
 
-        if opcode_base in [OP_STATUS, OP_HEARTBEAT]:
-            # Both 1030 and 1080 responses can contain telemetry in some firmware versions,
-            # but 1030 is the primary source. Both are typically 41 bytes.
+        if opcode_base == OP_STATUS:
+            _LOGGER.debug("FABER ITC: Received 1030 Payload (len=%d): %s", len(payload), payload.hex())
             if len(payload) >= 22:
-                # Based on detailed byte-level analysis:
                 state = payload[11]
                 flame = payload[15]
                 width = payload[16]
@@ -169,7 +168,7 @@ class FaberITCClient:
                     "temp": temp_raw / 10.0,
                 })
                 
-                _LOGGER.debug("Status: %s", self.last_status)
+                _LOGGER.debug("FABER ITC: Parsed Status: %s", self.last_status)
                 if self._callback:
                     self._callback(dict(self.last_status))
         
