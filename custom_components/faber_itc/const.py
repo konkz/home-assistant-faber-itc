@@ -1,10 +1,14 @@
 DOMAIN = "faber_itc"
 DEFAULT_PORT = 58779
+UDP_PORT = 59779
 CONF_HOST = "host"
+CONF_NAME = "name"
 
 # Protocol Markers
 MAGIC_START = b"\xA1\xA2\xA3\xA4"
 MAGIC_END = b"\xFA\xFB\xFC\xFD"
+UDP_MAGIC_START = b"\xAA\xAA\xAA\xAA\xFA\xBE\xFA\xBE"
+UDP_MAGIC_END = b"\xFA\xBE\xFA\xBE"
 PROTO_HEADER = b"\x00\xFA\x00\x02"
 SENDER_ID = b"\x00\x00\x7D\xED"
 

@@ -183,17 +183,39 @@ class FaberITCClient:
             self._parse_ascii_info(payload)
 
     def _parse_ascii_info(self, payload):
-        """Extract device metadata from payload."""
-        strings = re.findall(b"[ -~]{3,}", payload)
-        for s in strings:
-            try:
-                text = s.decode("ascii").strip("\x00").strip()
-                if not text: continue
-                if text == "Faber": self.device_info["manufacturer"] = text
-                elif text.startswith("M") and len(text) >= 8: self.device_info["serial"] = text
-                elif any(x in text for x in ["Aspect", "Premium", "MatriX"]): 
-                    self.device_info["model"] = text
-            except: continue
+        """Extract device metadata from payload (null-terminated strings)."""
+        # Split by null bytes and filter printable strings
+        parts = payload.split(b"\x00")
+        strings = []
+        for p in parts:
+            if len(p) >= 3:
+                try:
+                    text = p.decode("ascii").strip()
+                    if text:
+                        strings.append(text)
+                except UnicodeDecodeError:
+                    continue
+
+        if not strings:
+            return
+
+        # Based on faber_itc_protocol.md Section 7:
+        # 1010: 1: Model, 2: Article, 3: Variant
+        # 0410: 1: Name, 2: Phone, 3: Web, 4: Email
+        
+        # We use simple heuristics or position if known
+        for text in strings:
+            if text == "Faber":
+                self.device_info["manufacturer"] = text
+            elif text.startswith("M") and len(text) >= 8:
+                self.device_info["serial"] = text
+            elif any(x in text for x in ["Aspect", "Premium", "MatriX"]):
+                self.device_info["model"] = text
+
+        # If we have at least one string and model is still generic, 
+        # use the first one as it's likely the model name (0x1010)
+        if strings and self.device_info["model"] == "Faber ITC Fireplace":
+             self.device_info["model"] = strings[0]
 
     async def _send_control(self, param_id: int, value: int):
         """Helper to send control commands."""
