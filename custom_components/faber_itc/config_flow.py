@@ -60,9 +60,11 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if user_input["selected_device"] == "manual":
                 return await self.async_step_setup()
             
-            self._discovered_host = user_input["selected_device"]
-            self._discovered_name = self._discovered_devices.get(self._discovered_host)
-            return await self.async_step_setup()
+            host = user_input["selected_device"]
+            self._discovered_host = host
+            self._discovered_name = self._discovered_devices.get(host)
+            # Directly try to setup with the discovered host, skipping the manual setup form
+            return await self.async_step_setup({CONF_HOST: host})
 
         if not self._discovered_devices:
             return await self.async_step_setup()
@@ -82,24 +84,24 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_setup(self, user_input=None):
         errors = {}
         if user_input is not None and CONF_HOST in user_input:
+            host = user_input[CONF_HOST]
             try:
-                client = FaberITCClient(user_input[CONF_HOST], DEFAULT_PORT)
+                client = FaberITCClient(host, DEFAULT_PORT)
                 if await client.connect():
                     # Request more info to be sure about the model
                     await client.request_info()
                     
-                    # If we don't have a name yet (manual entry), use the model name from client
-                    if not self._discovered_name:
-                        self._discovered_name = client.device_info.get("model", "Faber Fireplace")
+                    # Use UDP name if available, otherwise use model name from client
+                    name = self._discovered_name or client.device_info.get("model", "Faber Fireplace")
                     
                     await client.disconnect()
                     
-                    # We store the discovered name in the entry data so it can be used for device naming
-                    user_input[CONF_NAME] = self._discovered_name
-                    
                     return self.async_create_entry(
-                        title=f"ITC Controller ({user_input[CONF_HOST]})", 
-                        data=user_input
+                        title=f"ITC Controller ({host})", 
+                        data={
+                            CONF_HOST: host,
+                            CONF_NAME: name,
+                        }
                     )
                 errors["base"] = "cannot_connect"
             except Exception:
