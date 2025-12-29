@@ -17,12 +17,13 @@ async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
     
     entities = []
-    # Main power switch
-    entities.append(FaberPowerSwitch(coordinator, entry))
     
     # Flame level switches (0-4)
     for level in range(5):
         entities.append(FaberFlameLevelSwitch(coordinator, entry, level))
+
+    # Main power switch
+    entities.append(FaberPowerSwitch(coordinator, entry))
         
     # Burner mode switches
     entities.append(FaberBurnerModeSwitch(coordinator, entry, True))  # Wide
@@ -57,7 +58,11 @@ class FaberPowerSwitch(FaberBaseSwitch):
         super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.entry_id}_power"
         self._attr_translation_key = "power"
-        self._attr_icon = "mdi:fire"
+
+    @property
+    def icon(self):
+        """Return dynamic icon based on state."""
+        return "mdi:fireplace" if self.is_on else "mdi:fireplace-off"
 
     @property
     def is_on(self):
@@ -81,11 +86,18 @@ class FaberFlameLevelSwitch(FaberBaseSwitch):
         self._level = level
         self._attr_unique_id = f"{entry.entry_id}_flame_level_{level}"
         self._attr_name = f"Flame Level {level}" if level > 0 else "Flame Off"
-        self._attr_icon = f"mdi:tally-mark-{level}" if level > 0 else "mdi:fire-off"
         if level == 0:
-             self._attr_translation_key = "flame_off"
+            self._attr_translation_key = "flame_off"
         else:
-             self._attr_translation_key = f"flame_level_{level}"
+            self._attr_translation_key = f"flame_level_{level}"
+            self._attr_icon = f"mdi:tally-mark-{level}"
+
+    @property
+    def icon(self):
+        """Return dynamic icon for level 0."""
+        if self._level == 0:
+            return "mdi:fire-off" if self.is_on else "mdi:fire"
+        return self._attr_icon
 
     @property
     def is_on(self):

@@ -42,7 +42,10 @@ Kopiere den Ordner `custom_components/faber_itc` in dein HA-Verzeichnis und star
 ---
 
 ### 🎨 Dashboard (Empfehlung)
-Für ein optimales Erlebnis mit der neuen **Tile Card** (HA 2023.6+), kannst du folgendes YAML in dein Dashboard kopieren:
+Für ein optimales Erlebnis mit der neuen **Tile Card** (HA 2023.6+), kannst du folgendes YAML in dein Dashboard kopieren.
+
+> [!TIP]
+> Die Entitäts-IDs (z.B. `switch.faber_fireplace_power`) hängen von dem Namen ab, den du bei der Einrichtung vergeben hast. Falls du den Kamin z.B. "Kamin" genannt hast, musst du die IDs im YAML entsprechend anpassen (z.B. `switch.kamin_power`).
 
 ```yaml
 type: vertical-stack
@@ -124,7 +127,10 @@ Copy the `custom_components/faber_itc` folder to your HA directory and restart.
 ---
 
 ### 🎨 Dashboard (Recommended)
-For the best experience using the **Tile Card** (HA 2023.6+), you can use this YAML in your dashboard:
+For the best experience using the **Tile Card** (HA 2023.6+), you can use this YAML in your dashboard.
+
+> [!TIP]
+> Entity IDs (e.g., `switch.faber_fireplace_power`) depend on the name you chose during setup. If you named it "Fireplace", you need to adjust the IDs in the YAML accordingly (e.g., `switch.fireplace_power`).
 
 ```yaml
 type: vertical-stack
