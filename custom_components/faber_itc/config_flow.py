@@ -58,14 +58,7 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         device_options = {
             ip: f"{name} ({ip})" for ip, name in self._discovered_devices.items()
         }
-        # Use localized string for manual entry
-        manual_entry_label = self.hass.helpers.template.render_complex(
-            "[[manual_entry]]", {}
-        )
-        if manual_entry_label == "[[manual_entry]]":
-            manual_entry_label = "Manual entry"
-
-        device_options["manual"] = manual_entry_label
+        device_options["manual"] = "Manuelle Eingabe / Manual entry"
 
         return self.async_show_form(
             step_id="discovery_result",

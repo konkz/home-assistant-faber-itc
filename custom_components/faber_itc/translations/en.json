@@ -32,7 +32,7 @@
       }
     },
     "progress": {
-      "discovery_action": "Searching for devices..."
+      "discovery_action": "Searching for Faber ITC fireplaces on the network. This process can take up to 30 seconds as devices broadcast their presence periodically. Please be patient."
     },
     "error": {
       "cannot_connect": "Failed to connect to controller",

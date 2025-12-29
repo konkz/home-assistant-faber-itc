@@ -32,7 +32,7 @@
       }
     },
     "progress": {
-      "discovery_action": "Suche nach Geräten..."
+      "discovery_action": "Es wird im Netzwerk nach Faber ITC Kaminen gesucht. Dieser Vorgang kann bis zu 30 Sekunden dauern, da die Geräte ihre Anwesenheit nur periodisch senden. Bitte haben Sie etwas Geduld."
     },
     "error": {
       "cannot_connect": "Verbindung zum Controller fehlgeschlagen",
