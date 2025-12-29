@@ -1,32 +1,32 @@
 {
-    "config": {
-        "step": {
-            "user": {
-                "title": "Faber ITC Setup"
-            },
-            "discovery": {
-                "title": "Device Discovery",
-                "description": "Searching for Faber ITC fireplaces on the network. This can take up to 35 seconds..."
-            },
-            "discovery_result": {
-                "title": "Discovered Devices",
-                "description": "Select a device or enter the details manually.",
-                "data": {
-                    "selected_device": "Device"
-                }
-            },
-            "setup": {
-                "title": "Configure Connection",
-                "description": "Verify the connection details.",
-                "data": {
-                    "host": "IP Address",
-                    "name": "Display Name"
-                }
-            }
-        },
-        "progress": {
-            "discovery_action": "Searching for devices..."
-        },
+  "config": {
+    "step": {
+      "user": {
+        "title": "Faber ITC Setup"
+      },
+      "discovery": {
+        "title": "Device Discovery",
+        "description": "Searching for Faber ITC fireplaces on the network. This can take up to 35 seconds..."
+      },
+      "discovery_result": {
+        "title": "Discovered Devices",
+        "description": "Select a device or enter the details manually.",
+        "data": {
+          "selected_device": "Device"
+        }
+      },
+      "setup": {
+        "title": "Configure Connection",
+        "description": "Verify the connection details.",
+        "data": {
+          "host": "IP Address",
+          "name": "Display Name"
+        }
+      }
+    },
+    "progress": {
+      "discovery_action": "Searching for devices..."
+    },
     "error": {
       "cannot_connect": "Failed to connect to controller",
       "invalid_auth": "Invalid authentication",
@@ -40,6 +40,9 @@
     "sensor": {
       "temperature": {
         "name": "Temperature"
+      },
+      "installer": {
+        "name": "Installer"
       }
     },
     "switch": {

@@ -42,13 +42,13 @@ class FaberBaseSwitch(CoordinatorEntity, SwitchEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        data = self.coordinator.data or {}
+        info = self.coordinator.client.device_info
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.entry_id)},
-            name="Faber Fireplace",
-            manufacturer=data.get("manufacturer", "Faber"),
-            model=data.get("model", "Faber ITC Fireplace"),
-            serial_number=data.get("serial"),
+            name=info.get("model", "Faber Fireplace"),
+            manufacturer=info.get("manufacturer", "Faber"),
+            model=info.get("model", "Faber ITC Fireplace"),
+            serial_number=info.get("serial"),
         )
 
 class FaberPowerSwitch(FaberBaseSwitch):

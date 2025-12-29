@@ -36,6 +36,12 @@ class FaberITCClient:
             "model": "Faber ITC Fireplace",
             "manufacturer": "Faber",
             "serial": None,
+            "article": None,
+            "variant": None,
+            "installer_name": None,
+            "installer_phone": None,
+            "installer_web": None,
+            "installer_mail": None,
         }
         self.last_status = {
             "state": 0,
@@ -180,15 +186,14 @@ class FaberITCClient:
                     self._callback(dict(self.last_status))
         
         elif opcode_base in [OP_IDENTIFY, OP_INFO_410, OP_INFO_1010]:
-            self._parse_ascii_info(payload)
+            self._parse_ascii_info(opcode_base, payload)
 
-    def _parse_ascii_info(self, payload):
+    def _parse_ascii_info(self, opcode_base, payload):
         """Extract device metadata from payload (null-terminated strings)."""
-        # Split by null bytes and filter printable strings
         parts = payload.split(b"\x00")
         strings = []
         for p in parts:
-            if len(p) >= 3:
+            if len(p) >= 2:
                 try:
                     text = p.decode("ascii").strip()
                     if text:
@@ -200,22 +205,21 @@ class FaberITCClient:
             return
 
         # Based on faber_itc_protocol.md Section 7:
-        # 1010: 1: Model, 2: Article, 3: Variant
-        # 0410: 1: Name, 2: Phone, 3: Web, 4: Email
-        
-        # We use simple heuristics or position if known
-        for text in strings:
-            if text == "Faber":
-                self.device_info["manufacturer"] = text
-            elif text.startswith("M") and len(text) >= 8:
-                self.device_info["serial"] = text
-            elif any(x in text for x in ["Aspect", "Premium", "MatriX"]):
-                self.device_info["model"] = text
-
-        # If we have at least one string and model is still generic, 
-        # use the first one as it's likely the model name (0x1010)
-        if strings and self.device_info["model"] == "Faber ITC Fireplace":
-             self.device_info["model"] = strings[0]
+        if opcode_base == OP_INFO_1010:
+            if len(strings) >= 1: self.device_info["model"] = strings[0]
+            if len(strings) >= 2: 
+                self.device_info["article"] = strings[1]
+                if strings[1].startswith("M"):
+                    self.device_info["serial"] = strings[1]
+            if len(strings) >= 3: self.device_info["variant"] = strings[2]
+            _LOGGER.debug("Parsed Device Info: %s", self.device_info)
+            
+        elif opcode_base == OP_INFO_410:
+            if len(strings) >= 1: self.device_info["installer_name"] = strings[0]
+            if len(strings) >= 2: self.device_info["installer_phone"] = strings[1]
+            if len(strings) >= 3: self.device_info["installer_web"] = strings[2]
+            if len(strings) >= 4: self.device_info["installer_mail"] = strings[3]
+            _LOGGER.debug("Parsed Installer Info: %s", self.device_info)
 
     async def _send_control(self, param_id: int, value: int):
         """Helper to send control commands."""
@@ -226,6 +230,13 @@ class FaberITCClient:
             + struct.pack("<H", value)
         )
         await self._send_frame(OP_CONTROL, payload)
+
+    async def request_info(self):
+        """Request device and installer info."""
+        _LOGGER.debug("Requesting Device and Installer Info")
+        await self._send_frame(OP_INFO_1010, b"\x00" * 9)
+        await asyncio.sleep(0.2)
+        await self._send_frame(OP_INFO_410, b"\x00" * 9)
 
     async def update(self):
         """Poll for status and send heartbeat."""

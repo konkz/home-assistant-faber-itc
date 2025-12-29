@@ -18,6 +18,7 @@ class FaberITCUpdateCoordinator(DataUpdateCoordinator):
             name="Faber ITC Status",
             update_interval=timedelta(seconds=10),
         )
+        self._initial_info_fetched = False
         
         # Register callback for event-driven updates from the client's read loop
         self.client.set_callback(self._handle_client_update)
@@ -30,6 +31,11 @@ class FaberITCUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Fetch data from client."""
         try:
+            # Fetch device info once at the start or after reconnection
+            if not self._initial_info_fetched:
+                await self.client.request_info()
+                self._initial_info_fetched = True
+
             await self.client.update()
             data = await self.client.fetch_data()
             if data is None:

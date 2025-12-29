@@ -1,32 +1,32 @@
 {
-    "config": {
-        "step": {
-            "user": {
-                "title": "Faber ITC Einrichtung"
-            },
-            "discovery": {
-                "title": "Gerätesuche",
-                "description": "Es wird im Netzwerk nach Faber ITC Kaminen gesucht. Dies kann bis zu 35 Sekunden dauern..."
-            },
-            "discovery_result": {
-                "title": "Gefundene Geräte",
-                "description": "Wählen Sie ein Gerät aus oder geben Sie die Daten manuell ein.",
-                "data": {
-                    "selected_device": "Gerät"
-                }
-            },
-            "setup": {
-                "title": "Verbindung konfigurieren",
-                "description": "Überprüfen Sie die Verbindungsdaten.",
-                "data": {
-                    "host": "IP-Adresse",
-                    "name": "Anzeigename"
-                }
-            }
-        },
-        "progress": {
-            "discovery_action": "Suche nach Geräten..."
-        },
+  "config": {
+    "step": {
+      "user": {
+        "title": "Faber ITC Einrichtung"
+      },
+      "discovery": {
+        "title": "Gerätesuche",
+        "description": "Es wird im Netzwerk nach Faber ITC Kaminen gesucht. Dies kann bis zu 35 Sekunden dauern..."
+      },
+      "discovery_result": {
+        "title": "Gefundene Geräte",
+        "description": "Wählen Sie ein Gerät aus oder geben Sie die Daten manuell ein.",
+        "data": {
+          "selected_device": "Gerät"
+        }
+      },
+      "setup": {
+        "title": "Verbindung konfigurieren",
+        "description": "Überprüfen Sie die Verbindungsdaten.",
+        "data": {
+          "host": "IP-Adresse",
+          "name": "Anzeigename"
+        }
+      }
+    },
+    "progress": {
+      "discovery_action": "Suche nach Geräten..."
+    },
     "error": {
       "cannot_connect": "Verbindung zum Controller fehlgeschlagen",
       "invalid_auth": "Ungültige Authentifizierung",
@@ -40,6 +40,9 @@
     "sensor": {
       "temperature": {
         "name": "Temperatur"
+      },
+      "installer": {
+        "name": "Installateur"
       }
     },
     "switch": {
