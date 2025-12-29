@@ -258,7 +258,7 @@ class FaberITCClient:
         """Poll for status and send heartbeat."""
         await self._send_frame(OP_STATUS, b"\x00" * 9)
         await asyncio.sleep(0.1)
-        await self._send_frame(OP_HEARTBEAT, b"\x00" * 8)
+        await self._send_frame(OP_HEARTBEAT, b"\x00" * 9)
 
     async def turn_on(self):
         """Send ignition sequence."""

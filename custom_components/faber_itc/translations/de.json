@@ -37,7 +37,7 @@
       "already_configured": "Dieser Controller ist bereits konfiguriert"
     },
     "create_entry": {
-      "default": "Der ITC Controller wurde erfolgreich angebunden.\n Hier kannst du dem Gerät (Kamin) einen Namen geben und es einem Bereich zuordnen.\n\n"
+      "default": "Der ITC Controller wurde erfolgreich angebunden.\n Hier kannst du dem Gerät (Kamin) einen Namen geben und es einem Bereich zuordnen.\n \n"
     }
   },
   "entity": {

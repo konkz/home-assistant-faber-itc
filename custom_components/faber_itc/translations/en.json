@@ -37,7 +37,7 @@
       "already_configured": "This controller is already configured"
     },
     "create_entry": {
-      "default": "The ITC Controller has been successfully connected.\n Here you can name the device (fireplace) and assign it to an area.\n\n"
+      "default": "The ITC Controller has been successfully connected.\n Here you can name the device (fireplace) and assign it to an area.\n \n"
     }
   },
   "entity": {
