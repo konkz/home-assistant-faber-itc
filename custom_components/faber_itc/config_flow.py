@@ -69,17 +69,16 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_setup(self, user_input=None):
         errors = {}
-        if user_input is not None:
+        if user_input is not None and CONF_HOST in user_input and CONF_NAME in user_input:
             try:
                 client = FaberITCClient(user_input[CONF_HOST], DEFAULT_PORT)
                 if await client.connect():
-                    # If we have no name yet, try to get it from the client after connection
-                    if not user_input.get(CONF_NAME):
-                        user_input[CONF_NAME] = client.device_info.get("model", "Faber ITC")
-                    
+                    # Request more info to be sure about the model
+                    await client.request_info()
                     await client.disconnect()
+                    
                     return self.async_create_entry(
-                        title=user_input.get(CONF_NAME, f"Faber ITC ({user_input[CONF_HOST]})"), 
+                        title=f"ITC Controller ({user_input[CONF_HOST]})", 
                         data=user_input
                     )
                 errors["base"] = "cannot_connect"

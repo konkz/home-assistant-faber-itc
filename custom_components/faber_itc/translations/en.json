@@ -3,44 +3,39 @@
     "step": {
       "user": {
         "title": "Faber ITC Setup",
-        "description": "Choose automatic discovery or enter details manually.",
-        "data": {
-          "run_discovery": "Automatic discovery",
-          "host": "IP Address (only for manual entry)",
-          "name": "Display Name (optional)"
-        }
+        "description": "Automatic discovery for ITC Controllers is starting."
       },
       "discovery": {
-        "title": "Device Discovery",
-        "description": "Searching for Faber ITC fireplaces on the network. This process can take up to 30 seconds as devices broadcast their presence periodically. Please be patient."
+        "title": "Controller Discovery",
+        "description": "Searching for Faber ITC Controllers on the network. This process can take up to 30 seconds. Please be patient."
       },
       "discovery_result": {
-        "title": "Discovered Devices",
-        "description": "Select a device or enter the details manually.",
+        "title": "Discovered Controllers",
+        "description": "Select a controller or enter the details manually.",
         "data": {
-          "selected_device": "Device",
+          "selected_device": "Controller",
           "manual_entry": "Manual entry"
         }
       },
       "setup": {
         "title": "Configure Connection",
-        "description": "Verify the connection details.",
+        "description": "Verify the connection details and set a name for the fireplace.",
         "data": {
           "host": "IP Address",
-          "name": "Display Name"
+          "name": "Fireplace Name"
         }
       }
     },
     "progress": {
-      "discovery_action": "Searching for Faber ITC fireplaces on the network. This process can take up to 30 seconds as devices broadcast their presence periodically. Please be patient."
+      "discovery_action": "Searching for Faber ITC Controllers on the network. This process can take up to 30 seconds. Please be patient."
     },
     "error": {
-      "cannot_connect": "Failed to connect to controller",
+      "cannot_connect": "Failed to connect to ITC Controller",
       "invalid_auth": "Invalid authentication",
       "unknown": "Unexpected error"
     },
     "abort": {
-      "already_configured": "This device is already configured"
+      "already_configured": "This controller is already configured"
     }
   },
   "entity": {

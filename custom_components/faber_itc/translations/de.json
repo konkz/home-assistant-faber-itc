@@ -3,44 +3,39 @@
     "step": {
       "user": {
         "title": "Faber ITC Einrichtung",
-        "description": "Wählen Sie die automatische Suche oder geben Sie die Daten manuell ein.",
-        "data": {
-          "run_discovery": "Automatische Suche (Discovery)",
-          "host": "IP-Adresse (nur bei manueller Eingabe)",
-          "name": "Anzeigename (optional)"
-        }
+        "description": "Die automatische Suche nach ITC Controllern wird gestartet."
       },
       "discovery": {
-        "title": "Gerätesuche",
-        "description": "Es wird im Netzwerk nach Faber ITC Kaminen gesucht. Dieser Vorgang kann bis zu 30 Sekunden dauern, da die Geräte ihre Anwesenheit nur periodisch senden. Bitte haben Sie etwas Geduld."
+        "title": "Controller Suche",
+        "description": "Es wird im Netzwerk nach Faber ITC Controllern gesucht. Dieser Vorgang kann bis zu 30 Sekunden dauern. Bitte haben Sie etwas Geduld."
       },
       "discovery_result": {
-        "title": "Gefundene Geräte",
-        "description": "Wählen Sie ein Gerät aus oder geben Sie die Daten manuell ein.",
+        "title": "Gefundene Controller",
+        "description": "Wählen Sie einen Controller aus oder geben Sie die Daten manuell ein.",
         "data": {
-          "selected_device": "Gerät",
+          "selected_device": "Controller",
           "manual_entry": "Manuelle Eingabe"
         }
       },
       "setup": {
         "title": "Verbindung konfigurieren",
-        "description": "Überprüfen Sie die Verbindungsdaten.",
+        "description": "Überprüfen Sie die Verbindungsdaten und vergeben Sie einen Namen für den Kamin.",
         "data": {
           "host": "IP-Adresse",
-          "name": "Anzeigename"
+          "name": "Name des Kamins"
         }
       }
     },
     "progress": {
-      "discovery_action": "Es wird im Netzwerk nach Faber ITC Kaminen gesucht. Dieser Vorgang kann bis zu 30 Sekunden dauern, da die Geräte ihre Anwesenheit nur periodisch senden. Bitte haben Sie etwas Geduld."
+      "discovery_action": "Es wird im Netzwerk nach Faber ITC Controllern gesucht. Dieser Vorgang kann bis zu 30 Sekunden dauern. Bitte haben Sie etwas Geduld."
     },
     "error": {
-      "cannot_connect": "Verbindung zum Controller fehlgeschlagen",
+      "cannot_connect": "Verbindung zum ITC Controller fehlgeschlagen",
       "invalid_auth": "Ungültige Authentifizierung",
       "unknown": "Unerwarteter Fehler"
     },
     "abort": {
-      "already_configured": "Dieses Gerät ist bereits konfiguriert"
+      "already_configured": "Dieser Controller ist bereits konfiguriert"
     }
   },
   "entity": {
