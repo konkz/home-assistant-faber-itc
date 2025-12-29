@@ -11,9 +11,22 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._discovered_devices = {}
 
     async def async_step_user(self, user_input=None):
-        if user_input is None:
-            return await self.async_step_discovery()
-        return await self.async_step_setup(user_input)
+        """Handle the initial step."""
+        if user_input is not None:
+            if user_input.get("run_discovery"):
+                return await self.async_step_discovery()
+            
+            if user_input.get(CONF_HOST):
+                return await self.async_step_setup(user_input)
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema({
+                vol.Optional("run_discovery", default=True): bool,
+                vol.Optional(CONF_HOST): str,
+                vol.Optional(CONF_NAME, default="Faber ITC"): str,
+            })
+        )
 
     async def async_step_discovery(self, user_input=None):
         """Step to discover devices or proceed to manual entry."""
@@ -27,7 +40,6 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_setup({CONF_HOST: host, CONF_NAME: name})
 
         # Perform discovery (35s timeout because devices broadcast every 30s)
-        # async_show_progress will show a loading spinner/hourglass in the UI
         return self.async_show_progress(
             step_id="discovery",
             progress_action="discovery_action",
@@ -35,8 +47,19 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_discovery_action(self, user_input=None):
         """Perform the actual discovery background task."""
-        self._discovered_devices = await async_discover_devices(timeout=35.0)
-        return self.async_show_progress_done(next_step_id="discovery_result")
+        # This will be called when the background task finishes or via manual trigger
+        if user_input is not None:
+             return self.async_show_progress_done(next_step_id="discovery_result")
+
+        async def _discovery_task():
+            self._discovered_devices = await async_discover_devices(timeout=35.0)
+            self.hass.async_create_task(
+                self.hass.config_entries.flow.async_configure(
+                    flow_id=self.flow_id, user_input={"done": True}
+                )
+            )
+
+        self.hass.async_create_task(_discovery_task())
 
     async def async_step_discovery_result(self, user_input=None):
         """Show results of discovery."""

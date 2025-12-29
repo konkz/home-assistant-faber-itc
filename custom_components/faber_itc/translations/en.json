@@ -2,7 +2,13 @@
   "config": {
     "step": {
       "user": {
-        "title": "Faber ITC Setup"
+        "title": "Faber ITC Setup",
+        "description": "Enter the details manually or let the integration search for fireplaces automatically.",
+        "data": {
+          "run_discovery": "Search automatically on the network (recommended)",
+          "host": "IP Address (for manual entry)",
+          "name": "Display Name"
+        }
       },
       "discovery": {
         "title": "Device Discovery",

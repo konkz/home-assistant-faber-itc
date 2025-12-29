@@ -190,16 +190,23 @@ class FaberITCClient:
 
     def _parse_ascii_info(self, opcode_base, payload):
         """Extract device metadata from payload (null-terminated strings)."""
+        _LOGGER.debug("Parsing Info for Opcode 0x%04X, Payload: %s", opcode_base, payload.hex())
+        
+        # Split by null bytes and filter printable strings
         parts = payload.split(b"\x00")
         strings = []
         for p in parts:
-            if len(p) >= 2:
+            # Clean non-printable chars but keep spaces
+            clean_p = bytes([b for b in p if 32 <= b <= 126])
+            if len(clean_p) >= 2:
                 try:
-                    text = p.decode("ascii").strip()
+                    text = clean_p.decode("ascii").strip()
                     if text:
                         strings.append(text)
                 except UnicodeDecodeError:
                     continue
+
+        _LOGGER.debug("Extracted strings: %s", strings)
 
         if not strings:
             return
@@ -209,17 +216,19 @@ class FaberITCClient:
             if len(strings) >= 1: self.device_info["model"] = strings[0]
             if len(strings) >= 2: 
                 self.device_info["article"] = strings[1]
+                # Often the article or a separate string is the serial
                 if strings[1].startswith("M"):
                     self.device_info["serial"] = strings[1]
             if len(strings) >= 3: self.device_info["variant"] = strings[2]
-            _LOGGER.debug("Parsed Device Info: %s", self.device_info)
+            _LOGGER.info("Device Info Updated: Model=%s, Serial=%s", 
+                         self.device_info["model"], self.device_info["serial"])
             
         elif opcode_base == OP_INFO_410:
             if len(strings) >= 1: self.device_info["installer_name"] = strings[0]
             if len(strings) >= 2: self.device_info["installer_phone"] = strings[1]
             if len(strings) >= 3: self.device_info["installer_web"] = strings[2]
             if len(strings) >= 4: self.device_info["installer_mail"] = strings[3]
-            _LOGGER.debug("Parsed Installer Info: %s", self.device_info)
+            _LOGGER.info("Installer Info Updated: Name=%s", self.device_info["installer_name"])
 
     async def _send_control(self, param_id: int, value: int):
         """Helper to send control commands."""
