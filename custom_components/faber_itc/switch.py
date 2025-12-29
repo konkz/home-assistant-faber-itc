@@ -85,7 +85,6 @@ class FaberFlameLevelSwitch(FaberBaseSwitch):
         super().__init__(coordinator, entry)
         self._level = level
         self._attr_unique_id = f"{entry.entry_id}_flame_level_{level}"
-        self._attr_name = f"Flame Level {level}" if level > 0 else "Flame Off"
         if level == 0:
             self._attr_translation_key = "flame_off"
         else:

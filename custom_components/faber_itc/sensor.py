@@ -47,4 +47,4 @@ class FaberTemperatureSensor(CoordinatorEntity, SensorEntity):
         """Return the current temperature."""
         if not self.coordinator.data:
             return None
-        return self.coordinator.data.get("temperature")
+        return self.coordinator.data.get("temp")
