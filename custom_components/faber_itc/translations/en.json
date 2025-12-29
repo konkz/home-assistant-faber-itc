@@ -12,13 +12,14 @@
       },
       "discovery": {
         "title": "Device Discovery",
-        "description": "Searching for Faber ITC fireplaces on the network. This can take up to 35 seconds..."
+        "description": "Searching for Faber ITC fireplaces on the network. This process can take up to 30 seconds as devices broadcast their presence periodically. Please be patient."
       },
       "discovery_result": {
         "title": "Discovered Devices",
         "description": "Select a device or enter the details manually.",
         "data": {
-          "selected_device": "Device"
+          "selected_device": "Device",
+          "manual_entry": "Manual entry"
         }
       },
       "setup": {

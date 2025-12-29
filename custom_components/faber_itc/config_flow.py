@@ -11,26 +11,8 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._discovered_devices = {}
 
     async def async_step_user(self, user_input=None):
-        """Handle the initial step."""
-        if user_input is not None:
-            if user_input.get("run_discovery"):
-                return await self.async_step_discovery()
-            
-            if user_input.get(CONF_HOST):
-                return await self.async_step_setup(user_input)
-
-        # In Home Assistant, we can't truly "gray out" based on a checkbox in a single step 
-        # without custom cards, but we can use a schema that suggests the alternative.
-        # To meet the requirement "only one of both", we keep the toggle but make 
-        # the fields optional and validate that if run_discovery is False, host is provided.
-        return self.async_show_form(
-            step_id="user",
-            data_schema=vol.Schema({
-                vol.Optional("run_discovery", default=True): bool,
-                vol.Optional(CONF_HOST): str,
-                vol.Optional(CONF_NAME, default="Faber ITC"): str,
-            })
-        )
+        """Handle the initial step - start discovery immediately."""
+        return await self.async_step_discovery()
 
     async def async_step_discovery(self, user_input=None):
         """Step to discover devices or proceed to manual entry."""
@@ -60,13 +42,30 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_discovery_result(self, user_input=None):
         """Show results of discovery."""
+        if user_input is not None:
+            if user_input["selected_device"] == "manual":
+                return await self.async_step_setup()
+            
+            selected_ip = user_input["selected_device"]
+            return await self.async_step_setup({
+                CONF_HOST: selected_ip,
+                CONF_NAME: self._discovered_devices.get(selected_ip, "Faber ITC")
+            })
+
         if not self._discovered_devices:
             return await self.async_step_setup()
 
         device_options = {
             ip: f"{name} ({ip})" for ip, name in self._discovered_devices.items()
         }
-        device_options["manual"] = "Manuelle Eingabe"
+        # Use localized string for manual entry
+        manual_entry_label = self.hass.helpers.template.render_complex(
+            "[[manual_entry]]", {}
+        )
+        if manual_entry_label == "[[manual_entry]]":
+            manual_entry_label = "Manual entry"
+
+        device_options["manual"] = manual_entry_label
 
         return self.async_show_form(
             step_id="discovery_result",

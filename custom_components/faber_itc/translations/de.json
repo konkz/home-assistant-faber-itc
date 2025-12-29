@@ -12,13 +12,14 @@
       },
       "discovery": {
         "title": "Gerätesuche",
-        "description": "Es wird im Netzwerk nach Faber ITC Kaminen gesucht. Dies kann bis zu 35 Sekunden dauern..."
+        "description": "Es wird im Netzwerk nach Faber ITC Kaminen gesucht. Dieser Vorgang kann bis zu 30 Sekunden dauern, da die Geräte ihre Anwesenheit nur periodisch senden. Bitte haben Sie etwas Geduld."
       },
       "discovery_result": {
         "title": "Gefundene Geräte",
         "description": "Wählen Sie ein Gerät aus oder geben Sie die Daten manuell ein.",
         "data": {
-          "selected_device": "Gerät"
+          "selected_device": "Gerät",
+          "manual_entry": "Manuelle Eingabe"
         }
       },
       "setup": {
