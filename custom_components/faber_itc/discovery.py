@@ -6,8 +6,9 @@ from .const import UDP_PORT, UDP_MAGIC_START, UDP_MAGIC_END
 _LOGGER = logging.getLogger(__name__)
 
 class FaberITCDiscoveryProtocol(asyncio.DatagramProtocol):
-    def __init__(self, on_discovery):
+    def __init__(self, on_discovery, discovery_event):
         self.on_discovery = on_discovery
+        self.discovery_event = discovery_event
 
     def datagram_received(self, data, addr):
         _LOGGER.debug("Received UDP packet from %s: %s", addr, data.hex())
@@ -34,30 +35,41 @@ class FaberITCDiscoveryProtocol(asyncio.DatagramProtocol):
             host = controller_ip if controller_ip else addr[0]
             
             _LOGGER.debug("Discovered device '%s' with IP %s (source: %s)", device_name, host, addr[0])
-            self.on_discovery(host, device_name)
+            if self.on_discovery(host, device_name):
+                self.discovery_event.set()
         except Exception as e:
             _LOGGER.error("Error decoding discovery packet: %s", e)
 
-async def async_discover_devices(timeout=5.0):
+async def async_discover_devices(timeout=5.0, is_new_device=None):
     """Scan for Faber ITC devices via UDP broadcast."""
     discovered = {}
+    discovery_event = asyncio.Event()
 
     def on_discovery(ip, name):
         if ip not in discovered:
             _LOGGER.debug("Discovered Faber ITC: %s at %s", name, ip)
             discovered[ip] = name
+            # If it's a new device (or no filter provided), signal to stop discovery
+            if is_new_device is None or is_new_device(ip):
+                return True
+        return False
 
     loop = asyncio.get_running_loop()
     
     # Use a custom socket to allow broadcast listening if needed, 
     # though standard binding to 0.0.0.0:UDP_PORT usually suffices for received broadcasts
-    transport, protocol = await loop.create_datagram_endpoint(
-        lambda: FaberITCDiscoveryProtocol(on_discovery),
+    transport, _ = await loop.create_datagram_endpoint(
+        lambda: FaberITCDiscoveryProtocol(on_discovery, discovery_event),
         local_addr=("0.0.0.0", UDP_PORT)
     )
 
     try:
-        await asyncio.sleep(timeout)
+        # Wait for the first new device to be found or timeout
+        try:
+            await asyncio.wait_for(discovery_event.wait(), timeout=timeout)
+            _LOGGER.debug("Discovery stopped early after finding a new device")
+        except asyncio.TimeoutError:
+            _LOGGER.debug("Discovery timed out after %s seconds", timeout)
     finally:
         transport.close()
 

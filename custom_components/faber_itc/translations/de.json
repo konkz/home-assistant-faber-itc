@@ -7,11 +7,11 @@
       },
       "discovery": {
         "title": "Controller Suche",
-        "description": "Es wird im Netzwerk nach Faber ITC Controllern gesucht. Dieser Vorgang kann bis zu 30 Sekunden dauern. Bitte haben Sie etwas Geduld."
+        "description": "Es wird im Netzwerk nach Faber ITC Controllern gesucht. Dieser Vorgang kann bis zu 30 Sekunden dauern. Bitte habe Geduld."
       },
       "discovery_result": {
         "title": "Gefundene Controller",
-        "description": "Wählen Sie einen Controller aus oder geben Sie die Daten manuell ein.",
+        "description": "Wähle einen Controller aus oder gib die IP Adresse manuell ein.",
         "data": {
           "selected_device": "Controller",
           "manual_entry": "Manuelle Eingabe"
@@ -19,15 +19,14 @@
       },
       "setup": {
         "title": "Verbindung konfigurieren",
-        "description": "Überprüfen Sie die Verbindungsdaten und vergeben Sie einen Namen für den Kamin.",
+        "description": "Gib die IP-Adresse des ITC Controllers ein.",
         "data": {
-          "host": "IP-Adresse",
-          "name": "Name des Kamins"
+          "host": "IP-Adresse"
         }
       }
     },
     "progress": {
-      "discovery_action": "Es wird im Netzwerk nach Faber ITC Controllern gesucht. Dieser Vorgang kann bis zu 30 Sekunden dauern. Bitte haben Sie etwas Geduld."
+      "discovery_action": "Es wird im Netzwerk nach Faber ITC Controllern gesucht. Dieser Vorgang kann bis zu 30 Sekunden dauern. Bitte habe Geduld."
     },
     "error": {
       "cannot_connect": "Verbindung zum ITC Controller fehlgeschlagen",
@@ -38,7 +37,7 @@
       "already_configured": "Dieser Controller ist bereits konfiguriert"
     },
     "create_entry": {
-      "default": "Controller erfolgreich erstellt"
+      "default": "Der ITC Controller wurde erfolgreich angebunden. Hier kannst du dem Gerät (Kamin) einen Namen geben und es einem Raum zuordnen."
     }
   },
   "entity": {

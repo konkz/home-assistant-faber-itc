@@ -11,7 +11,7 @@
       },
       "discovery_result": {
         "title": "Discovered Controllers",
-        "description": "Select a controller or enter the details manually.",
+        "description": "Select a controller or enter the IP address manually.",
         "data": {
           "selected_device": "Controller",
           "manual_entry": "Manual entry"
@@ -19,10 +19,9 @@
       },
       "setup": {
         "title": "Configure Connection",
-        "description": "Verify the connection details and set a name for the fireplace.",
+        "description": "Enter the IP address of the ITC Controller.",
         "data": {
-          "host": "IP Address",
-          "name": "Fireplace Name"
+          "host": "IP Address"
         }
       }
     },
@@ -38,7 +37,7 @@
       "already_configured": "This controller is already configured"
     },
     "create_entry": {
-      "default": "Controller created successfully"
+      "default": "The ITC Controller has been successfully connected. Here you can name the device (fireplace) and assign it to a room."
     }
   },
   "entity": {

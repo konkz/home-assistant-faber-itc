@@ -9,6 +9,8 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self):
         self._discovered_devices = {}
+        self._discovered_host = None
+        self._discovered_name = None
 
     async def async_step_user(self, user_input=None):
         """Handle the initial step - start discovery immediately."""
@@ -29,7 +31,19 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def _async_discovery_task(self):
         """Perform the actual discovery background task."""
-        self._discovered_devices = await async_discover_devices(timeout=35.0)
+        current_hosts = {
+            entry.data.get(CONF_HOST)
+            for entry in self._async_current_entries()
+        }
+
+        def is_new_device(ip):
+            return ip not in current_hosts
+
+        self._discovered_devices = await async_discover_devices(
+            timeout=35.0, 
+            is_new_device=is_new_device
+        )
+        
         self.hass.async_create_task(
             self.hass.config_entries.flow.async_configure(
                 flow_id=self.flow_id, user_input={"done": True}
@@ -46,11 +60,9 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if user_input["selected_device"] == "manual":
                 return await self.async_step_setup()
             
-            selected_ip = user_input["selected_device"]
-            return await self.async_step_setup({
-                CONF_HOST: selected_ip,
-                CONF_NAME: self._discovered_devices.get(selected_ip, "Faber ITC")
-            })
+            self._discovered_host = user_input["selected_device"]
+            self._discovered_name = self._discovered_devices.get(self._discovered_host)
+            return await self.async_step_setup()
 
         if not self._discovered_devices:
             return await self.async_step_setup()
@@ -58,7 +70,7 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         device_options = {
             ip: f"ITC Controller ({ip})" for ip in self._discovered_devices
         }
-        device_options["manual"] = "Manuelle Eingabe / Manual entry"
+        device_options["manual"] = "Enter IP address"
 
         return self.async_show_form(
             step_id="discovery_result",
@@ -69,13 +81,21 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_setup(self, user_input=None):
         errors = {}
-        if user_input is not None and CONF_HOST in user_input and CONF_NAME in user_input:
+        if user_input is not None and CONF_HOST in user_input:
             try:
                 client = FaberITCClient(user_input[CONF_HOST], DEFAULT_PORT)
                 if await client.connect():
                     # Request more info to be sure about the model
                     await client.request_info()
+                    
+                    # If we don't have a name yet (manual entry), use the model name from client
+                    if not self._discovered_name:
+                        self._discovered_name = client.device_info.get("model", "Faber Fireplace")
+                    
                     await client.disconnect()
+                    
+                    # We store the discovered name in the entry data so it can be used for device naming
+                    user_input[CONF_NAME] = self._discovered_name
                     
                     return self.async_create_entry(
                         title=f"ITC Controller ({user_input[CONF_HOST]})", 
@@ -85,17 +105,16 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except Exception:
                 errors["base"] = "unknown"
 
-        default_host = ""
-        default_name = "Faber ITC"
+        # Pre-fill with discovered data or previous user input
+        default_host = self._discovered_host or ""
+        
         if user_input:
-            default_host = user_input.get(CONF_HOST, "")
-            default_name = user_input.get(CONF_NAME, "Faber ITC")
+            default_host = user_input.get(CONF_HOST, default_host)
 
         return self.async_show_form(
             step_id="setup",
             data_schema=vol.Schema({
                 vol.Required(CONF_HOST, default=default_host): str,
-                vol.Required(CONF_NAME, default=default_name): str,
             }),
             errors=errors,
         )
