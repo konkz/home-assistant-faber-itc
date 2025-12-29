@@ -39,6 +39,47 @@ Kopiere den Ordner `custom_components/faber_itc` in dein HA-Verzeichnis und star
 ---
 *Getestet mit Aspect Premium RD L (M4435200)*
 
+---
+
+### 🎨 Dashboard (Empfehlung)
+Für ein optimales Erlebnis mit der neuen **Tile Card** (HA 2023.6+), kannst du folgendes YAML in dein Dashboard kopieren:
+
+```yaml
+type: vertical-stack
+cards:
+  - type: tile
+    entity: switch.faber_fireplace_power
+    name: Kamin
+    icon: mdi:fire
+    color: deep-orange
+    tap_action: { action: toggle }
+    state_content: [state, last_changed]
+
+  - type: grid
+    columns: 5
+    square: false
+    cards:
+      - { type: tile, entity: switch.faber_flame_0, vertical: true, hide_state: true, color: disabled }
+      - { type: tile, entity: switch.faber_flame_1, vertical: true, hide_state: true, color: yellow }
+      - { type: tile, entity: switch.faber_flame_2, vertical: true, hide_state: true, color: amber }
+      - { type: tile, entity: switch.faber_flame_3, vertical: true, hide_state: true, color: orange }
+      - { type: tile, entity: switch.faber_flame_4, vertical: true, hide_state: true, color: red }
+
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - { type: tile, entity: switch.faber_mode_narrow, vertical: true, hide_state: true, color: blue }
+      - { type: tile, entity: switch.faber_mode_wide, vertical: true, hide_state: true, color: indigo }
+
+  - type: tile
+    entity: sensor.faber_temperature
+    color: blue-grey
+    features:
+      - type: trend-graph
+        hours_to_show: 8
+```
+
 <br>
 <br>
 
@@ -79,3 +120,44 @@ Copy the `custom_components/faber_itc` folder to your HA directory and restart.
 
 ---
 *Tested with Aspect Premium RD L (M4435200)*
+
+---
+
+### 🎨 Dashboard (Recommended)
+For the best experience using the **Tile Card** (HA 2023.6+), you can use this YAML in your dashboard:
+
+```yaml
+type: vertical-stack
+cards:
+  - type: tile
+    entity: switch.faber_fireplace_power
+    name: Fireplace
+    icon: mdi:fire
+    color: deep-orange
+    tap_action: { action: toggle }
+    state_content: [state, last_changed]
+
+  - type: grid
+    columns: 5
+    square: false
+    cards:
+      - { type: tile, entity: switch.faber_flame_0, vertical: true, hide_state: true, color: disabled }
+      - { type: tile, entity: switch.faber_flame_1, vertical: true, hide_state: true, color: yellow }
+      - { type: tile, entity: switch.faber_flame_2, vertical: true, hide_state: true, color: amber }
+      - { type: tile, entity: switch.faber_flame_3, vertical: true, hide_state: true, color: orange }
+      - { type: tile, entity: switch.faber_flame_4, vertical: true, hide_state: true, color: red }
+
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - { type: tile, entity: switch.faber_mode_narrow, vertical: true, hide_state: true, color: blue }
+      - { type: tile, entity: switch.faber_mode_wide, vertical: true, hide_state: true, color: indigo }
+
+  - type: tile
+    entity: sensor.faber_temperature
+    color: blue-grey
+    features:
+      - type: trend-graph
+        hours_to_show: 8
+```

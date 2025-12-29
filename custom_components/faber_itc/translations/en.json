@@ -19,45 +19,35 @@
     }
   },
   "entity": {
-    "climate": {
-      "fireplace": {
-        "name": "Flame Control",
-        "state": {
-          "heat": "On",
-          "off": "Off"
-        },
-        "state_attributes": {
-          "hvac_action": {
-            "name": "Flame",
-            "state": {
-              "heating": "On",
-              "idle": "Off",
-              "off": "Off"
-            }
-          },
-          "preset_mode": {
-            "name": "Burner",
-            "state": {
-              "narrow": "Narrow",
-              "wide": "Wide"
-            }
-          },
-          "temperature": {
-            "name": "Level"
-          },
-          "status_description": {
-            "name": "Status Description"
-          },
-          "flame_width_raw": {
-            "name": "Burner Width (Raw)"
-          },
-          "flame_height_raw": {
-            "name": "Flame Height (Raw)"
-          },
-          "flame_level": {
-            "name": "Flame Level"
-          }
-        }
+    "sensor": {
+      "temperature": {
+        "name": "Temperature"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Fireplace"
+      },
+      "flame_off": {
+        "name": "Off"
+      },
+      "flame_level_1": {
+        "name": "Level 1"
+      },
+      "flame_level_2": {
+        "name": "Level 2"
+      },
+      "flame_level_3": {
+        "name": "Level 3"
+      },
+      "flame_level_4": {
+        "name": "Level 4"
+      },
+      "mode_narrow": {
+        "name": "Narrow"
+      },
+      "mode_wide": {
+        "name": "Wide"
       }
     }
   }

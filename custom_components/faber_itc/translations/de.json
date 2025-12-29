@@ -19,45 +19,35 @@
     }
   },
   "entity": {
-    "climate": {
-      "fireplace": {
-        "name": "Flammensteuerung",
-        "state": {
-          "heat": "An",
-          "off": "Aus"
-        },
-        "state_attributes": {
-          "hvac_action": {
-            "name": "Flamme",
-            "state": {
-              "heating": "An",
-              "idle": "Aus",
-              "off": "Aus"
-            }
-          },
-          "preset_mode": {
-            "name": "Brenner",
-            "state": {
-              "narrow": "Schmal",
-              "wide": "Breit"
-            }
-          },
-          "temperature": {
-            "name": "Stufe"
-          },
-          "status_description": {
-            "name": "Statusbeschreibung"
-          },
-          "flame_width_raw": {
-            "name": "Brennerbreite (Rohwert)"
-          },
-          "flame_height_raw": {
-            "name": "Flammenhöhe (Rohwert)"
-          },
-          "flame_level": {
-            "name": "Flammenstufe"
-          }
-        }
+    "sensor": {
+      "temperature": {
+        "name": "Temperatur"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Kamin"
+      },
+      "flame_off": {
+        "name": "Aus"
+      },
+      "flame_level_1": {
+        "name": "Stufe 1"
+      },
+      "flame_level_2": {
+        "name": "Stufe 2"
+      },
+      "flame_level_3": {
+        "name": "Stufe 3"
+      },
+      "flame_level_4": {
+        "name": "Stufe 4"
+      },
+      "mode_narrow": {
+        "name": "Schmal"
+      },
+      "mode_wide": {
+        "name": "Breit"
       }
     }
   }
