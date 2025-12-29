@@ -106,7 +106,7 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     await client.disconnect()
                     
                     return self.async_create_entry(
-                        title=name, 
+                        title=f"ITC Controller ({host})", 
                         data={
                             CONF_HOST: host,
                             CONF_NAME: name,

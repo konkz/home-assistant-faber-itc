@@ -192,18 +192,25 @@ class FaberITCClient:
         """Extract device metadata from payload (null-terminated strings)."""
         _LOGGER.debug("Parsing Info for Opcode 0x%04X, Payload: %s", opcode_base, payload.hex())
         
-        # Split by null bytes and filter printable strings
-        parts = payload.split(b"\x00")
+        if len(payload) < 9:
+            return
+
+        # According to dissector and protocol: 
+        # Payload = Reserved (8 bytes) + Length Byte (1 byte) + Data
+        data_part = payload[9:]
+        
+        # Split by null bytes and decode
         strings = []
-        for p in parts:
-            # Clean non-printable chars but keep spaces
-            clean_p = bytes([b for b in p if 32 <= b <= 126])
-            if len(clean_p) >= 2:
+        for p in data_part.split(b"\x00"):
+            if len(p) > 0:
                 try:
-                    text = clean_p.decode("ascii").strip()
+                    # Use latin-1 to preserve more characters than strict ascii
+                    # or utf-8 with ignore/replace if device uses it.
+                    text = p.decode("latin-1").strip()
                     if text:
                         strings.append(text)
-                except UnicodeDecodeError:
+                except Exception as e:
+                    _LOGGER.debug("String decode error: %s", e)
                     continue
 
         _LOGGER.debug("Extracted strings: %s", strings)

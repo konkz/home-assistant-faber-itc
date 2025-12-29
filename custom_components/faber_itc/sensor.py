@@ -41,7 +41,7 @@ class FaberTemperatureSensor(CoordinatorEntity, SensorEntity):
         info = self.coordinator.client.device_info
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.entry_id)},
-            name=info.get("model", "Faber Fireplace"),
+            name=self._entry.data.get("name") or info.get("model", "Faber Fireplace"),
             manufacturer=info.get("manufacturer", "Faber"),
             model=info.get("model", "Faber ITC Fireplace"),
             serial_number=info.get("serial"),
@@ -73,7 +73,7 @@ class FaberInstallerSensor(CoordinatorEntity, SensorEntity):
         info = self.coordinator.client.device_info
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.entry_id)},
-            name=info.get("model", "Faber Fireplace"),
+            name=self._entry.data.get("name") or info.get("model", "Faber Fireplace"),
             manufacturer=info.get("manufacturer", "Faber"),
             model=info.get("model", "Faber ITC Fireplace"),
             serial_number=info.get("serial"),
