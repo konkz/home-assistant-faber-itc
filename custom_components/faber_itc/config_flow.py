@@ -19,6 +19,10 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if user_input.get(CONF_HOST):
                 return await self.async_step_setup(user_input)
 
+        # In Home Assistant, we can't truly "gray out" based on a checkbox in a single step 
+        # without custom cards, but we can use a schema that suggests the alternative.
+        # To meet the requirement "only one of both", we keep the toggle but make 
+        # the fields optional and validate that if run_discovery is False, host is provided.
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema({
@@ -31,35 +35,28 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_discovery(self, user_input=None):
         """Step to discover devices or proceed to manual entry."""
         if user_input is not None:
-            if user_input.get("manual_entry") or user_input.get("selected_device") == "manual":
-                return await self.async_step_setup()
-            
-            # User selected a discovered device
-            host = user_input["selected_device"]
-            name = self._discovered_devices.get(host, "Faber ITC")
-            return await self.async_step_setup({CONF_HOST: host, CONF_NAME: name})
+            # This is called when the progress task is done
+            return self.async_show_progress_done(next_step_id="discovery_result")
 
         # Perform discovery (35s timeout because devices broadcast every 30s)
         return self.async_show_progress(
             step_id="discovery",
             progress_action="discovery_action",
+            progress_task=self.hass.async_create_task(self._async_discovery_task()),
+        )
+
+    async def _async_discovery_task(self):
+        """Perform the actual discovery background task."""
+        self._discovered_devices = await async_discover_devices(timeout=35.0)
+        self.hass.async_create_task(
+            self.hass.config_entries.flow.async_configure(
+                flow_id=self.flow_id, user_input={"done": True}
+            )
         )
 
     async def async_step_discovery_action(self, user_input=None):
-        """Perform the actual discovery background task."""
-        # This will be called when the background task finishes or via manual trigger
-        if user_input is not None:
-             return self.async_show_progress_done(next_step_id="discovery_result")
-
-        async def _discovery_task():
-            self._discovered_devices = await async_discover_devices(timeout=35.0)
-            self.hass.async_create_task(
-                self.hass.config_entries.flow.async_configure(
-                    flow_id=self.flow_id, user_input={"done": True}
-                )
-            )
-
-        self.hass.async_create_task(_discovery_task())
+        """Not used but required by progress_action in older versions/specific flows."""
+        return self.async_show_progress_done(next_step_id="discovery_result")
 
     async def async_step_discovery_result(self, user_input=None):
         """Show results of discovery."""

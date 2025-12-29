@@ -30,8 +30,10 @@ class FaberTemperatureSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry):
         super().__init__(coordinator)
         self._entry = entry
+        # Use a stable unique_id based on entry_id to prevent recorder issues
         self._attr_unique_id = f"{entry.entry_id}_temperature"
         self._attr_translation_key = "temperature"
+        self.entity_id = f"sensor.{DOMAIN}_fireplace_temperature"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -63,6 +65,7 @@ class FaberInstallerSensor(CoordinatorEntity, SensorEntity):
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_installer"
         self._attr_translation_key = "installer"
+        self.entity_id = f"sensor.{DOMAIN}_fireplace_installer"
 
     @property
     def device_info(self) -> DeviceInfo:

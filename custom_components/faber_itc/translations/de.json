@@ -3,11 +3,11 @@
     "step": {
       "user": {
         "title": "Faber ITC Einrichtung",
-        "description": "Geben Sie die Daten manuell ein oder lassen Sie die Integration automatisch nach Kaminen suchen.",
+        "description": "Wählen Sie die automatische Suche oder geben Sie die Daten manuell ein.",
         "data": {
-          "run_discovery": "Automatisch im Netzwerk suchen (empfohlen)",
-          "host": "IP-Adresse (bei manueller Eingabe)",
-          "name": "Anzeigename"
+          "run_discovery": "Automatische Suche (Discovery)",
+          "host": "IP-Adresse (nur bei manueller Eingabe)",
+          "name": "Anzeigename (optional)"
         }
       },
       "discovery": {

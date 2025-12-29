@@ -10,22 +10,33 @@ class FaberITCDiscoveryProtocol(asyncio.DatagramProtocol):
         self.on_discovery = on_discovery
 
     def datagram_received(self, data, addr):
-        if len(data) < 28:
+        _LOGGER.debug("Received UDP packet from %s: %s", addr, data.hex())
+        
+        if len(data) < 48:
+            _LOGGER.debug("Packet too short: %d bytes", len(data))
             return
 
         if not data.startswith(UDP_MAGIC_START) or not data.endswith(UDP_MAGIC_END):
+            _LOGGER.debug("Magic bytes mismatch")
             return
 
         # sender_id = data[8:12]
-        # ip_bytes = data[12:16]
+        ip_bytes = data[12:16] # This is the controller IP inside the payload
         # seq = data[16:20]
-        name_bytes = data[20:-4]
+        name_bytes = data[20:44]
         
         try:
+            # Parse IP from payload
+            controller_ip = ".".join(map(str, ip_bytes))
             device_name = name_bytes.split(b"\x00")[0].decode("ascii").strip()
-            self.on_discovery(addr[0], device_name)
+            
+            # Prefer IP from payload, fallback to source IP if parsing fails (unlikely)
+            host = controller_ip if controller_ip else addr[0]
+            
+            _LOGGER.debug("Discovered device '%s' with IP %s (source: %s)", device_name, host, addr[0])
+            self.on_discovery(host, device_name)
         except Exception as e:
-            _LOGGER.debug("Error decoding discovery name: %s", e)
+            _LOGGER.error("Error decoding discovery packet: %s", e)
 
 async def async_discover_devices(timeout=5.0):
     """Scan for Faber ITC devices via UDP broadcast."""
