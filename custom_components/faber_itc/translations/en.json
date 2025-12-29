@@ -36,6 +36,9 @@
     },
     "abort": {
       "already_configured": "This controller is already configured"
+    },
+    "create_entry": {
+      "default": "Controller created successfully"
     }
   },
   "entity": {

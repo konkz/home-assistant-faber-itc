@@ -56,7 +56,7 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_setup()
 
         device_options = {
-            ip: f"{name} ({ip})" for ip, name in self._discovered_devices.items()
+            ip: f"ITC Controller ({ip})" for ip in self._discovered_devices
         }
         device_options["manual"] = "Manuelle Eingabe / Manual entry"
 
