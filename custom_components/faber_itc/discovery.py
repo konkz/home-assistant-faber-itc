@@ -29,8 +29,15 @@ class FaberITCDiscoveryProtocol(asyncio.DatagramProtocol):
         try:
             # Parse IP from payload
             controller_ip = ".".join(map(str, ip_bytes))
-            device_name = name_bytes.split(b"\x00")[0].decode("ascii").strip()
+            # Try UTF-8 first, fallback to ASCII, ignore errors to get at least something
+            try:
+                device_name = name_bytes.split(b"\x00")[0].decode("utf-8").strip()
+            except UnicodeDecodeError:
+                device_name = name_bytes.split(b"\x00")[0].decode("ascii", errors="ignore").strip()
             
+            if not device_name:
+                device_name = f"Faber ITC {controller_ip}"
+
             # Prefer IP from payload, fallback to source IP if parsing fails (unlikely)
             host = controller_ip if controller_ip else addr[0]
             

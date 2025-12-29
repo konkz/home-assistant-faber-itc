@@ -61,10 +61,15 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_setup()
             
             host = user_input["selected_device"]
+            name = self._discovered_devices.get(host)
             self._discovered_host = host
-            self._discovered_name = self._discovered_devices.get(host)
+            self._discovered_name = name
+            
             # Directly try to setup with the discovered host, skipping the manual setup form
-            return await self.async_step_setup({CONF_HOST: host})
+            return await self.async_step_setup({
+                CONF_HOST: host,
+                CONF_NAME: name,
+            })
 
         if not self._discovered_devices:
             return await self.async_step_setup()
@@ -85,19 +90,23 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         if user_input is not None and CONF_HOST in user_input:
             host = user_input[CONF_HOST]
+            # Priority: 1. Name from user_input (passed from discovery_result), 2. Already discovered name, 3. None
+            name = user_input.get(CONF_NAME) or self._discovered_name
+            
             try:
                 client = FaberITCClient(host, DEFAULT_PORT)
                 if await client.connect():
                     # Request more info to be sure about the model
                     await client.request_info()
                     
-                    # Use UDP name if available, otherwise use model name from client
-                    name = self._discovered_name or client.device_info.get("model", "Faber Fireplace")
+                    # Fallback to model name if still no name
+                    if not name:
+                        name = client.device_info.get("model", "Faber Fireplace")
                     
                     await client.disconnect()
                     
                     return self.async_create_entry(
-                        title=f"ITC Controller ({host})", 
+                        title=name, 
                         data={
                             CONF_HOST: host,
                             CONF_NAME: name,

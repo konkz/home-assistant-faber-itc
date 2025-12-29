@@ -7,7 +7,7 @@
       },
       "discovery": {
         "title": "Controller Discovery",
-        "description": "Searching for Faber ITC Controllers on the network. This process can take up to 30 seconds. Please be patient."
+        "description": "Searching for Faber ITC Controllers on the network.\n This process can take up to 30 seconds. Please be patient."
       },
       "discovery_result": {
         "title": "Discovered Controllers",
@@ -26,7 +26,7 @@
       }
     },
     "progress": {
-      "discovery_action": "Searching for Faber ITC Controllers on the network. This process can take up to 30 seconds. Please be patient."
+      "discovery_action": "Searching for Faber ITC Controllers on the network.\n This process can take up to 30 seconds. Please be patient."
     },
     "error": {
       "cannot_connect": "Failed to connect to ITC Controller",
@@ -37,7 +37,7 @@
       "already_configured": "This controller is already configured"
     },
     "create_entry": {
-      "default": "The ITC Controller has been successfully connected. Here you can name the device (fireplace) and assign it to a room."
+      "default": "The ITC Controller has been successfully connected.\n Here you can name the device (fireplace) and assign it to an area.\n\n"
     }
   },
   "entity": {
