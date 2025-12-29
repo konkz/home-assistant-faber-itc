@@ -1,3 +1,7 @@
+<p align="center">
+  <a href="#english-description">English Description Below</a>
+</p>
+
 # <img src="https://raw.githubusercontent.com/konkz/home-assistant-faber-itc/main/icon.png" width="32" height="32" align="center"> Faber ITC for Home Assistant
 
 Steuere deinen Faber Gaskamin lokal über Home Assistant. Diese Integration verbindet sich direkt mit dem Faber ITC Controller in deinem Netzwerk – schnell, zuverlässig und ohne Cloud.
@@ -38,6 +42,7 @@ Kopiere den Ordner `custom_components/faber_itc` in dein HA-Verzeichnis und star
 <br>
 <br>
 
+<a name="english-description"></a>
 # <img src="https://raw.githubusercontent.com/konkz/home-assistant-faber-itc/main/icon.png" width="32" height="32" align="center"> Faber ITC for Home Assistant
 
 Control your Faber gas fireplace locally via Home Assistant. This integration connects directly to the Faber ITC controller in your network – fast, reliable, and cloud-free.
