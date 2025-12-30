@@ -150,8 +150,10 @@ class FaberFlameLevelSwitch(FaberBaseSwitch):
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs):
-        # Level 0 cannot be turned off individually (it's the base state of 'ON')
+        # Turning off pilot flame (level 0) just re-sends the command to stay on
         if self._level == 0:
+            await self._client.set_flame_height(INTENSITY_LEVELS[0])
+            await self.coordinator.async_request_refresh()
             return
 
         # Turning off levels 1-4 reverts to pilot flame (level 0)
@@ -181,6 +183,6 @@ class FaberBurnerModeSwitch(FaberBaseSwitch):
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs):
-        # Toggle to the other mode
-        await self._client.set_flame_width(not self._wide)
+        # Turning off a burner mode just re-sends the command for the current mode
+        await self._client.set_flame_width(self._wide)
         await self.coordinator.async_request_refresh()
