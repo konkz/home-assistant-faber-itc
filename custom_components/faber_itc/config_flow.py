@@ -58,7 +58,7 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_discovery_result(self, user_input=None):
         """Show results of discovery."""
-        if user_input is not None:
+        if user_input is not None and "selected_device" in user_input:
             if user_input["selected_device"] == "manual":
                 return await self.async_step_setup()
             
