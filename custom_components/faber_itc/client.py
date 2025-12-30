@@ -173,8 +173,9 @@ class FaberITCClient:
                 flame = data_part[6]
                 width = data_part[7]
                 
-                # Temperature is a 16-bit Big Endian value at offset 12 & 13
-                temp_raw = struct.unpack(">H", data_part[12:14])[0]
+                # Temperature is a 16-bit Little Endian value at offset 12 & 13
+                # According to logs: 00 be -> 190 -> 19.0
+                temp_raw = struct.unpack("<H", data_part[12:14])[0]
                 
                 self.last_status.update({
                     "state": state,

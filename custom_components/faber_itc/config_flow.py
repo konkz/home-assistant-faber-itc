@@ -95,6 +95,12 @@ class FaberITCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_setup(self, user_input=None):
         errors = {}
+        
+        # If we have a discovered sender_id, set unique_id early
+        if self._discovered_sender_id:
+            await self.async_set_unique_id(self._discovered_sender_id)
+            self._abort_if_unique_id_configured()
+
         if user_input is not None and CONF_HOST in user_input:
             host = user_input[CONF_HOST]
             # Priority: 1. Name from user_input, 2. Discovered name
