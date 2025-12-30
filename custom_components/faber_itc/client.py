@@ -271,21 +271,21 @@ class FaberITCClient:
         await self._send_control(0x0002, 0)
         await asyncio.sleep(0.1)
         await self._send_control(0x0020, 0)
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
         await self.update()
 
     async def turn_off(self):
         """Send power off command."""
         _LOGGER.info("Sending Turn Off command")
         await self._send_control(0x0001, 0)
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
         await self.update()
 
     async def set_flame_height(self, level: int):
         """Set flame level (0x00, 0x19, 0x32, 0x4B, 0x64)."""
         _LOGGER.info("Setting flame level to %s", hex(level))
         await self._send_control(0x0009, level)
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
         await self.update()
 
     async def set_flame_width(self, wide: bool):
@@ -293,7 +293,7 @@ class FaberITCClient:
         _LOGGER.info("Setting flame width to %s", "wide" if wide else "narrow")
         param_id = 0x0006 if wide else 0x0005
         await self._send_control(param_id, 0)
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
         await self.update()
 
     async def fetch_data(self):

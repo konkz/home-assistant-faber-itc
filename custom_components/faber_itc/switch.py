@@ -87,10 +87,12 @@ class FaberPowerSwitch(FaberBaseSwitch):
         return self.coordinator.data.get("state", STATE_OFF) != STATE_OFF
 
     async def async_turn_on(self, **kwargs):
+        self.coordinator.async_set_expected_state({"state": 1})
         await self._client.turn_on()
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs):
+        self.coordinator.async_set_expected_state({"state": 0})
         await self._client.turn_off()
         await self.coordinator.async_request_refresh()
 
@@ -143,20 +145,24 @@ class FaberFlameLevelSwitch(FaberBaseSwitch):
     async def async_turn_on(self, **kwargs):
         # Ensure fireplace is on
         if self.coordinator.data.get("state", STATE_OFF) == STATE_OFF:
+            self.coordinator.async_set_expected_state({"state": 1})
             await self._client.turn_on()
 
         protocol_value = INTENSITY_LEVELS.get(self._level, 0x00)
+        self.coordinator.async_set_expected_state({"flame_height": protocol_value})
         await self._client.set_flame_height(protocol_value)
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs):
         # Turning off pilot flame (level 0) just re-sends the command to stay on
         if self._level == 0:
+            self.coordinator.async_set_expected_state({"flame_height": INTENSITY_LEVELS[0]})
             await self._client.set_flame_height(INTENSITY_LEVELS[0])
             await self.coordinator.async_request_refresh()
             return
 
         # Turning off levels 1-4 reverts to pilot flame (level 0)
+        self.coordinator.async_set_expected_state({"flame_height": INTENSITY_LEVELS[0]})
         await self._client.set_flame_height(INTENSITY_LEVELS[0])
         await self.coordinator.async_request_refresh()
 
@@ -179,10 +185,14 @@ class FaberBurnerModeSwitch(FaberBaseSwitch):
         return is_wide_active if self._wide else not is_wide_active
 
     async def async_turn_on(self, **kwargs):
+        protocol_value = WIDTH_WIDE if self._wide else WIDTH_NARROW
+        self.coordinator.async_set_expected_state({"flame_width": protocol_value})
         await self._client.set_flame_width(self._wide)
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs):
         # Turning off a burner mode just re-sends the command for the current mode
+        protocol_value = WIDTH_WIDE if self._wide else WIDTH_NARROW
+        self.coordinator.async_set_expected_state({"flame_width": protocol_value})
         await self._client.set_flame_width(self._wide)
         await self.coordinator.async_request_refresh()

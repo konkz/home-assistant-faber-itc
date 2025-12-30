@@ -28,6 +28,14 @@ class FaberITCUpdateCoordinator(DataUpdateCoordinator):
         """Handle status update from client read loop."""
         self.async_set_updated_data(data)
 
+    @callback
+    def async_set_expected_state(self, updates: dict):
+        """Optimistically update the coordinator data."""
+        if self.data:
+            new_data = dict(self.data)
+            new_data.update(updates)
+            self.async_set_updated_data(new_data)
+
     async def _async_update_data(self):
         """Fetch data from client."""
         try:
