@@ -34,13 +34,16 @@ class FaberTemperatureSensor(CoordinatorEntity, SensorEntity):
         # Use a stable unique_id based on entry_id to prevent recorder issues
         self._attr_unique_id = f"{entry.entry_id}_temperature"
         self._attr_translation_key = "temperature"
-        self.entity_id = f"sensor.{entry.entry_id}_temperature"
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
         info = self.coordinator.client.device_info
-        model_name = info.get("model") or self._entry.data.get("name") or "Faber ITC Fireplace"
+        # Use info from client if it was successfully fetched (not default), otherwise entry name
+        model_name = info.get("model")
+        if not model_name or model_name == "Faber ITC Fireplace":
+            model_name = self._entry.data.get("name") or "Faber ITC Fireplace"
+            
         sender_id = self._entry.data.get(CONF_SENDER_ID)
         
         identifiers = {(DOMAIN, self._entry.entry_id)}
@@ -78,16 +81,15 @@ class FaberInstallerSensor(CoordinatorEntity, SensorEntity):
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_installer"
         self._attr_translation_key = "installer"
-        self.entity_id = f"sensor.{entry.entry_id}_installer"
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
-        # This property is already correctly implemented in FaberTemperatureSensor
-        # and inherited by CoordinatorEntity. But since we have it here too,
-        # let's keep it consistent.
         info = self.coordinator.client.device_info
-        model_name = info.get("model") or self._entry.data.get("name") or "Faber ITC Fireplace"
+        model_name = info.get("model")
+        if not model_name or model_name == "Faber ITC Fireplace":
+            model_name = self._entry.data.get("name") or "Faber ITC Fireplace"
+            
         sender_id = self._entry.data.get(CONF_SENDER_ID)
         
         identifiers = {(DOMAIN, self._entry.entry_id)}

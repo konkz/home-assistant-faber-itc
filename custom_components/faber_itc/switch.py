@@ -45,7 +45,10 @@ class FaberBaseSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def device_info(self) -> DeviceInfo:
         info = self.coordinator.client.device_info
-        model_name = info.get("model") or self._entry.data.get("name") or "Faber ITC Fireplace"
+        model_name = info.get("model")
+        if not model_name or model_name == "Faber ITC Fireplace":
+            model_name = self._entry.data.get("name") or "Faber ITC Fireplace"
+            
         sender_id = self._entry.data.get(CONF_SENDER_ID)
         
         identifiers = {(DOMAIN, self._entry.entry_id)}
@@ -71,7 +74,6 @@ class FaberPowerSwitch(FaberBaseSwitch):
         super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.entry_id}_power"
         self._attr_translation_key = "power"
-        self.entity_id = f"switch.{entry.entry_id}_power"
 
     @property
     def icon(self):
@@ -165,7 +167,6 @@ class FaberBurnerModeSwitch(FaberBaseSwitch):
         self._attr_unique_id = f"{entry.entry_id}_mode_{'wide' if wide else 'narrow'}"
         self._attr_translation_key = f"mode_{'wide' if wide else 'narrow'}"
         self._attr_icon = "mdi:arrow-expand-horizontal" if wide else "mdi:format-horizontal-align-center"
-        self.entity_id = f"switch.{entry.entry_id}_mode_{'wide' if wide else 'narrow'}"
 
     @property
     def is_on(self):

@@ -198,22 +198,25 @@ class FaberITCClient:
         # According to dissector and protocol: 
         # Payload = Reserved (8 bytes) + Length Byte (1 byte) + Data
         data_part = payload[9:]
+        _LOGGER.debug("Data part for Opcode 0x%04X: %s", opcode_base, data_part.hex())
         
         # Split by null bytes and decode
         strings = []
+        # The device often pads with 0x00 or has multiple 0x00 between strings
         for p in data_part.split(b"\x00"):
-            if len(p) > 0:
+            if len(p) >= 2: # Ignore single bytes or empty strings
                 try:
-                    # Use latin-1 to preserve more characters than strict ascii
-                    # or utf-8 with ignore/replace if device uses it.
+                    # Use latin-1 to preserve more characters
                     text = p.decode("latin-1").strip()
+                    # Filter out non-printable characters except space
+                    text = "".join(c for c in text if c.isprintable())
                     if text:
                         strings.append(text)
                 except Exception as e:
                     _LOGGER.debug("String decode error: %s", e)
                     continue
 
-        _LOGGER.debug("Extracted strings: %s", strings)
+        _LOGGER.debug("Extracted strings for Opcode 0x%04X: %s", opcode_base, strings)
 
         if not strings:
             return

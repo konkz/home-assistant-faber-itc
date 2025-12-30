@@ -31,10 +31,11 @@ class FaberITCUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Fetch data from client."""
         try:
-            # Fetch device info once at the start or after reconnection
-            if not self._initial_info_fetched:
+            # Fetch device info if missing
+            info = self.client.device_info
+            if not info.get("serial") or not info.get("installer_name"):
+                _LOGGER.debug("Missing device or installer info, requesting...")
                 await self.client.request_info()
-                self._initial_info_fetched = True
 
             await self.client.update()
             data = await self.client.fetch_data()
