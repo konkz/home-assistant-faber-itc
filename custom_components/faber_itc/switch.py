@@ -111,23 +111,25 @@ class FaberFlameLevelSwitch(FaberBaseSwitch):
     def icon(self):
         """Return dynamic icon for level 0."""
         if self._level == 0:
-            return "mdi:fire-off" if self.is_on else "mdi:fire"
+            return "mdi:fire" if self.is_on else "mdi:fire-off"
         return self._attr_icon
 
     @property
     def is_on(self):
         if not self.coordinator.data:
             return False
-        
-        # If fireplace is off, only level 0 is "on"
-        is_fireplace_on = self.coordinator.data.get("state", STATE_OFF) != STATE_OFF
-        if not is_fireplace_on:
-            return self._level == 0
 
-        # Fireplace is on, check intensity
+        is_fireplace_on = self.coordinator.data.get("state", STATE_OFF) != STATE_OFF
+
+        # Pilot flame (level 0) is "on" whenever the fireplace is on
+        if self._level == 0:
+            return is_fireplace_on
+
+        # For other levels, check if fireplace is on and matches intensity
+        if not is_fireplace_on:
+            return False
+
         intensity_val = self.coordinator.data.get("flame_height", 0)
-        
-        # Find closest level
         closest_lvl = 0
         min_diff = 999
         for lvl, val in INTENSITY_LEVELS.items():
@@ -135,28 +137,26 @@ class FaberFlameLevelSwitch(FaberBaseSwitch):
             if diff < min_diff:
                 min_diff = diff
                 closest_lvl = lvl
-        
+
         return self._level == closest_lvl
 
     async def async_turn_on(self, **kwargs):
-        if self._level == 0:
-            await self._client.turn_off()
-        else:
-            # Ensure fireplace is on
-            if self.coordinator.data.get("state", STATE_OFF) == STATE_OFF:
-                await self._client.turn_on()
-            
-            protocol_value = INTENSITY_LEVELS.get(self._level, 0x19)
-            await self._client.set_flame_height(protocol_value)
-            
+        # Ensure fireplace is on
+        if self.coordinator.data.get("state", STATE_OFF) == STATE_OFF:
+            await self._client.turn_on()
+
+        protocol_value = INTENSITY_LEVELS.get(self._level, 0x00)
+        await self._client.set_flame_height(protocol_value)
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs):
-        # Turning off a level switch doesn't make much sense in mutual exclusive UI,
-        # but we map it to turning off the fireplace or level 0 for consistency.
-        if self._level != 0:
-            await self._client.turn_off()
-            await self.coordinator.async_request_refresh()
+        # Level 0 cannot be turned off individually (it's the base state of 'ON')
+        if self._level == 0:
+            return
+
+        # Turning off levels 1-4 reverts to pilot flame (level 0)
+        await self._client.set_flame_height(INTENSITY_LEVELS[0])
+        await self.coordinator.async_request_refresh()
 
 class FaberBurnerModeSwitch(FaberBaseSwitch):
     """Switch representing burner width (Narrow/Wide)."""
