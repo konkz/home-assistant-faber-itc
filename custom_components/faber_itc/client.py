@@ -223,9 +223,8 @@ class FaberITCClient:
             if len(strings) >= 1: self.device_info["model"] = strings[0]
             if len(strings) >= 2: 
                 self.device_info["article"] = strings[1]
-                # Often the article or a separate string is the serial
-                if strings[1].startswith("M"):
-                    self.device_info["serial"] = strings[1]
+                # The 'Article No' is often the model identifier (serial)
+                self.device_info["serial"] = strings[1]
             if len(strings) >= 3: self.device_info["variant"] = strings[2]
             _LOGGER.info("Device Info Updated: Model=%s, Serial=%s", 
                          self.device_info["model"], self.device_info["serial"])

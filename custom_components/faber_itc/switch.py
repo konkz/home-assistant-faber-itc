@@ -1,9 +1,11 @@
 import logging
 from homeassistant.components.switch import SwitchEntity
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
+    CONF_SENDER_ID,
     INTENSITY_LEVELS,
     STATE_OFF,
     WIDTH_WIDE,
@@ -43,11 +45,22 @@ class FaberBaseSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def device_info(self) -> DeviceInfo:
         info = self.coordinator.client.device_info
+        model_name = info.get("model") or self._entry.data.get("name") or "Faber ITC Fireplace"
+        sender_id = self._entry.data.get(CONF_SENDER_ID)
+        
+        identifiers = {(DOMAIN, self._entry.entry_id)}
+        connections = set()
+        if sender_id:
+            identifiers.add((DOMAIN, sender_id))
+            formatted_mac = ":".join(sender_id[i:i+2] for i in range(0, len(sender_id), 2))
+            connections.add((dr.CONNECTION_NETWORK_MAC, formatted_mac))
+
         return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.entry_id)},
-            name=self._entry.data.get("name") or info.get("model", "Faber Fireplace"),
+            identifiers=identifiers,
+            connections=connections,
+            name=model_name,
             manufacturer=info.get("manufacturer", "Faber"),
-            model=info.get("model", "Faber ITC Fireplace"),
+            model=model_name,
             serial_number=info.get("serial"),
         )
 

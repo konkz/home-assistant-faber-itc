@@ -21,7 +21,7 @@ class FaberITCDiscoveryProtocol(asyncio.DatagramProtocol):
             _LOGGER.debug("Magic bytes mismatch")
             return
 
-        # sender_id = data[8:12]
+        sender_id_hex = data[8:12].hex()
         ip_bytes = data[12:16] # This is the controller IP inside the payload
         # seq = data[16:20]
         name_bytes = data[20:44]
@@ -41,23 +41,23 @@ class FaberITCDiscoveryProtocol(asyncio.DatagramProtocol):
             # Prefer IP from payload, fallback to source IP if parsing fails (unlikely)
             host = controller_ip if controller_ip else addr[0]
             
-            _LOGGER.debug("Discovered device '%s' with IP %s (source: %s)", device_name, host, addr[0])
-            if self.on_discovery(host, device_name):
+            _LOGGER.debug("Discovered device '%s' with IP %s (ID: %s)", device_name, host, sender_id_hex)
+            if self.on_discovery(host, device_name, sender_id_hex):
                 self.discovery_event.set()
         except Exception as e:
             _LOGGER.error("Error decoding discovery packet: %s", e)
 
 async def async_discover_devices(timeout=5.0, is_new_device=None):
     """Scan for Faber ITC devices via UDP broadcast."""
-    discovered = {}
+    discovered = {} # ip -> {name, sender_id}
     discovery_event = asyncio.Event()
 
-    def on_discovery(ip, name):
+    def on_discovery(ip, name, sender_id):
         if ip not in discovered:
-            _LOGGER.debug("Discovered Faber ITC: %s at %s", name, ip)
-            discovered[ip] = name
+            _LOGGER.debug("Discovered Faber ITC: %s at %s (ID: %s)", name, ip, sender_id)
             # If it's a new device (or no filter provided), signal to stop discovery
-            if is_new_device is None or is_new_device(ip):
+            if is_new_device is None or is_new_device(ip, sender_id):
+                discovered[ip] = {"name": name, "sender_id": sender_id}
                 return True
         return False
 

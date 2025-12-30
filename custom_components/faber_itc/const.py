@@ -3,6 +3,7 @@ DEFAULT_PORT = 58779
 UDP_PORT = 59779
 CONF_HOST = "host"
 CONF_NAME = "name"
+CONF_SENDER_ID = "sender_id"
 
 # Protocol Markers
 MAGIC_START = b"\xA1\xA2\xA3\xA4"
