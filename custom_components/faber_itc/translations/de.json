@@ -55,7 +55,7 @@
         "state_attributes": {
           "hint": {
             "state": {
-              "hold_to_toggle": "Zum umschalten lange drücken"
+              "hold_to_toggle": "Zum ein- / ausschalten lange drücken"
             }
           }
         }

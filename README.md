@@ -51,10 +51,13 @@ cards:
     name:
       type: device
     show_entity_picture: false
-    hide_state: true
+    hide_state: false
+    state_content: hint
     vertical: false
     tap_action:
       action: none
+    hold_action:
+      action: toggle
     icon_tap_action:
       action: none
     features_position: inline
@@ -127,18 +130,22 @@ cards:
     type: grid
     cards:
       - type: tile
-        entity: switch.<YOUR_DEVICE_ID>_fireplace
-        name: Status
-        icon: mdi:fire
-        color: deep-orange
-        hide_state: false
-        state_content: hint
-        vertical: false
+        entity: sensor.<YOUR_DEVICE_ID>_installer
+        name: " "
+        icon: mdi:campfire
+        color: disabled
+        show_entity_picture: false
+        hide_state: true
+        vertical: true
         tap_action:
           action: none
         hold_action:
-          action: toggle
+          action: none
+        double_tap_action:
+          action: none
         icon_tap_action:
+          action: none
+        icon_hold_action:
           action: none
         features_position: bottom
       - type: tile
@@ -165,7 +172,26 @@ cards:
         icon_tap_action:
           action: none
         features_position: bottom
-    columns: 3
+      - type: tile
+        entity: sensor.<YOUR_DEVICE_ID>_installer
+        name: " "
+        icon: mdi:campfire
+        color: disabled
+        show_entity_picture: false
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        double_tap_action:
+          action: none
+        icon_tap_action:
+          action: none
+        icon_hold_action:
+          action: none
+        features_position: bottom
+    columns: 4
   - type: tile
     entity: sensor.<YOUR_DEVICE_ID>_temperature
     name:
@@ -232,10 +258,13 @@ cards:
     name:
       type: device
     show_entity_picture: false
-    hide_state: true
+    hide_state: false
+    state_content: hint
     vertical: false
     tap_action:
       action: none
+    hold_action:
+      action: toggle
     icon_tap_action:
       action: none
     features_position: inline
@@ -308,18 +337,22 @@ cards:
     type: grid
     cards:
       - type: tile
-        entity: switch.<YOUR_DEVICE_ID>_fireplace
-        name: Status
-        icon: mdi:fire
-        color: deep-orange
-        hide_state: false
-        state_content: hint
-        vertical: false
+        entity: sensor.<YOUR_DEVICE_ID>_installer
+        name: " "
+        icon: mdi:campfire
+        color: disabled
+        show_entity_picture: false
+        hide_state: true
+        vertical: true
         tap_action:
           action: none
         hold_action:
-          action: toggle
+          action: none
+        double_tap_action:
+          action: none
         icon_tap_action:
+          action: none
+        icon_hold_action:
           action: none
         features_position: bottom
       - type: tile
@@ -346,7 +379,26 @@ cards:
         icon_tap_action:
           action: none
         features_position: bottom
-    columns: 3
+      - type: tile
+        entity: sensor.<YOUR_DEVICE_ID>_installer
+        name: " "
+        icon: mdi:campfire
+        color: disabled
+        show_entity_picture: false
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        double_tap_action:
+          action: none
+        icon_tap_action:
+          action: none
+        icon_hold_action:
+          action: none
+        features_position: bottom
+    columns: 4
   - type: tile
     entity: sensor.<YOUR_DEVICE_ID>_temperature
     name:

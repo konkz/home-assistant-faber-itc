@@ -55,7 +55,7 @@
         "state_attributes": {
           "hint": {
             "state": {
-              "hold_to_toggle": "Long press to toggle"
+              "hold_to_toggle": "Long press to toggle on / off"
             }
           }
         }
