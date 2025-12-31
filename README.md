@@ -1,6 +1,4 @@
-<p align="center">
-  <a href="#english-description">English Description Below</a>
-</p>
+[English Description Below](#-faber-itc-for-home-assistant-1)
 
 # <img src="https://raw.githubusercontent.com/konkz/home-assistant-faber-itc/main/icon.png" width="32" height="32" align="center"> Faber ITC for Home Assistant
 
@@ -9,8 +7,9 @@ Steuere deinen Faber Gaskamin lokal über Home Assistant. Diese Integration verb
 ---
 
 ### 🚀 Features
+- **Auto-Discovery:** Der Controller wird automatisch im Netzwerk gefunden.
 - **Power & Status:** Kamin an-/ausschalten inkl. Anzeige des Zündvorgangs.
-- **Flammensteuerung:** Höhe in 5 Stufen regulieren und zwischen schmalem/breitem Brenner umschalten.
+- **Flammensteuerung:** 5 Stufen inkl. permanenter **Zündflamme** (Pilot flame) und Wechsel zwischen schmalem/breitem Brenner.
 - **Temperatur:** Aktuelle Raumtemperatur direkt vom Controller auslesen.
 - **Lokal:** Kommunikation erfolgt direkt über TCP (Port 58779).
 
@@ -28,8 +27,8 @@ Kopiere den Ordner `custom_components/faber_itc` in dein HA-Verzeichnis und star
 
 ### ⚙️ Konfiguration
 1. Gehe zu **Einstellungen > Geräte & Dienste**.
-2. Suche nach **Faber ITC**.
-3. Gib die IP-Adresse deines ITC Controllers ein – fertig!
+2. Suche nach **Faber ITC** (oder warte auf die automatische Entdeckung).
+3. Bestätige die Einrichtung – fertig!
 
 ---
 
@@ -42,51 +41,146 @@ Kopiere den Ordner `custom_components/faber_itc` in dein HA-Verzeichnis und star
 ---
 
 ### 🎨 Dashboard (Empfehlung)
-Für ein optimales Erlebnis mit der neuen **Tile Card** (HA 2023.6+), kannst du folgendes YAML in dein Dashboard kopieren.
-
-> [!TIP]
-> Die Entitäts-IDs (z.B. `switch.faber_fireplace_power`) hängen von dem Namen ab, den du bei der Einrichtung vergeben hast. Falls du den Kamin z.B. "Kamin" genannt hast, musst du die IDs im YAML entsprechend anpassen (z.B. `switch.kamin_power`).
+Für ein optimales Erlebnis mit der **Tile Card** (HA 2023.6+), kannst du folgendes YAML nutzen. Ersetze `<YOUR_DEVICE_ID>` durch die tatsächliche ID deines Kamins (z.B. `fireplace`).
 
 ```yaml
 type: vertical-stack
 cards:
   - type: tile
-    entity: switch.faber_fireplace_power
-    name: Kamin
-    icon: mdi:fire
-    color: deep-orange
-    tap_action: { action: toggle }
-    state_content: [state, last_changed]
-
+    entity: switch.<YOUR_DEVICE_ID>_fireplace
+    name:
+      type: device
+    show_entity_picture: false
+    hide_state: true
+    vertical: false
+    tap_action:
+      action: none
+    icon_tap_action:
+      action: none
+    features_position: inline
   - type: grid
     columns: 5
     square: false
     cards:
-      - { type: tile, entity: switch.faber_flame_0, vertical: true, hide_state: true, color: disabled }
-      - { type: tile, entity: switch.faber_flame_1, vertical: true, hide_state: true, color: yellow }
-      - { type: tile, entity: switch.faber_flame_2, vertical: true, hide_state: true, color: amber }
-      - { type: tile, entity: switch.faber_flame_3, vertical: true, hide_state: true, color: orange }
-      - { type: tile, entity: switch.faber_flame_4, vertical: true, hide_state: true, color: red }
-
-  - type: grid
-    columns: 2
-    square: false
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_pilot_flame
+        name:
+          type: entity
+        color: light-blue
+        show_entity_picture: false
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_level_1
+        name:
+          type: entity
+        color: yellow
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_level_2
+        name:
+          type: entity
+        color: amber
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_level_3
+        name:
+          type: entity
+        color: orange
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_level_4
+        name:
+          type: entity
+        color: red
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+  - square: false
+    type: grid
     cards:
-      - { type: tile, entity: switch.faber_mode_narrow, vertical: true, hide_state: true, color: blue }
-      - { type: tile, entity: switch.faber_mode_wide, vertical: true, hide_state: true, color: indigo }
-
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_fireplace
+        name: Status
+        icon: mdi:fire
+        color: deep-orange
+        hide_state: false
+        state_content: hint
+        vertical: false
+        tap_action:
+          action: none
+        hold_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_narrow
+        name:
+          type: entity
+        color: blue
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_wide
+        name:
+          type: entity
+        color: indigo
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+    columns: 3
   - type: tile
-    entity: sensor.faber_temperature
+    entity: sensor.<YOUR_DEVICE_ID>_temperature
+    name:
+      type: entity
     color: blue-grey
+    vertical: false
     features:
       - type: trend-graph
         hours_to_show: 8
+    features_position: bottom
 ```
 
 <br>
 <br>
 
-<a name="english-description"></a>
 # <img src="https://raw.githubusercontent.com/konkz/home-assistant-faber-itc/main/icon.png" width="32" height="32" align="center"> Faber ITC for Home Assistant
 
 Control your Faber gas fireplace locally via Home Assistant. This integration connects directly to the Faber ITC controller in your network – fast, reliable, and cloud-free.
@@ -94,8 +188,9 @@ Control your Faber gas fireplace locally via Home Assistant. This integration co
 ---
 
 ### 🚀 Features
+- **Auto-Discovery:** Controller is automatically found on your network.
 - **Power & Status:** Turn fireplace on/off including ignition status.
-- **Flame Control:** Adjust height in 5 levels and toggle between narrow/wide burners.
+- **Flame Control:** 5 levels including permanent **Pilot flame** and toggle between narrow/wide burners.
 - **Temperature:** Read current room temperature directly from the controller.
 - **Local:** Communication via direct TCP (Port 58779).
 
@@ -113,8 +208,8 @@ Copy the `custom_components/faber_itc` folder to your HA directory and restart.
 
 ### ⚙️ Configuration
 1. Go to **Settings > Devices & Services**.
-2. Search for **Faber ITC**.
-3. Enter the IP address of your ITC controller – that's it!
+2. Search for **Faber ITC** (or wait for automatic discovery).
+3. Confirm the setup – that's it!
 
 ---
 
@@ -127,43 +222,139 @@ Copy the `custom_components/faber_itc` folder to your HA directory and restart.
 ---
 
 ### 🎨 Dashboard (Recommended)
-For the best experience using the **Tile Card** (HA 2023.6+), you can use this YAML in your dashboard.
-
-> [!TIP]
-> Entity IDs (e.g., `switch.faber_fireplace_power`) depend on the name you chose during setup. If you named it "Fireplace", you need to adjust the IDs in the YAML accordingly (e.g., `switch.fireplace_power`).
+For the best experience using the **Tile Card** (HA 2023.6+), you can use this YAML. Replace `<YOUR_DEVICE_ID>` with the actual ID of your fireplace (e.g., `fireplace`).
 
 ```yaml
 type: vertical-stack
 cards:
   - type: tile
-    entity: switch.faber_fireplace_power
-    name: Fireplace
-    icon: mdi:fire
-    color: deep-orange
-    tap_action: { action: toggle }
-    state_content: [state, last_changed]
-
+    entity: switch.<YOUR_DEVICE_ID>_fireplace
+    name:
+      type: device
+    show_entity_picture: false
+    hide_state: true
+    vertical: false
+    tap_action:
+      action: none
+    icon_tap_action:
+      action: none
+    features_position: inline
   - type: grid
     columns: 5
     square: false
     cards:
-      - { type: tile, entity: switch.faber_flame_0, vertical: true, hide_state: true, color: disabled }
-      - { type: tile, entity: switch.faber_flame_1, vertical: true, hide_state: true, color: yellow }
-      - { type: tile, entity: switch.faber_flame_2, vertical: true, hide_state: true, color: amber }
-      - { type: tile, entity: switch.faber_flame_3, vertical: true, hide_state: true, color: orange }
-      - { type: tile, entity: switch.faber_flame_4, vertical: true, hide_state: true, color: red }
-
-  - type: grid
-    columns: 2
-    square: false
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_pilot_flame
+        name:
+          type: entity
+        color: light-blue
+        show_entity_picture: false
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_level_1
+        name:
+          type: entity
+        color: yellow
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_level_2
+        name:
+          type: entity
+        color: amber
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_level_3
+        name:
+          type: entity
+        color: orange
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_level_4
+        name:
+          type: entity
+        color: red
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+  - square: false
+    type: grid
     cards:
-      - { type: tile, entity: switch.faber_mode_narrow, vertical: true, hide_state: true, color: blue }
-      - { type: tile, entity: switch.faber_mode_wide, vertical: true, hide_state: true, color: indigo }
-
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_fireplace
+        name: Status
+        icon: mdi:fire
+        color: deep-orange
+        hide_state: false
+        state_content: hint
+        vertical: false
+        tap_action:
+          action: none
+        hold_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_narrow
+        name:
+          type: entity
+        color: blue
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+      - type: tile
+        entity: switch.<YOUR_DEVICE_ID>_wide
+        name:
+          type: entity
+        color: indigo
+        hide_state: true
+        vertical: true
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: none
+        features_position: bottom
+    columns: 3
   - type: tile
-    entity: sensor.faber_temperature
+    entity: sensor.<YOUR_DEVICE_ID>_temperature
+    name:
+      type: entity
     color: blue-grey
+    vertical: false
     features:
       - type: trend-graph
         hours_to_show: 8
+    features_position: bottom
 ```

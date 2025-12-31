@@ -85,6 +85,12 @@ class FaberPowerSwitch(FaberBaseSwitch):
         if not self.coordinator.data:
             return False
         return self.coordinator.data.get("state", STATE_OFF) != STATE_OFF
+    @property
+    def extra_state_attributes(self):
+        """Return entity specific state attributes."""
+        return {
+            "hint": "hold_to_toggle",
+        }
 
     async def async_turn_on(self, **kwargs):
         self.coordinator.async_set_expected_state({"state": 1})

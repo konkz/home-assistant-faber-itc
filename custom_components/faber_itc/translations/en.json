@@ -51,7 +51,14 @@
     },
     "switch": {
       "power": {
-        "name": "Fireplace"
+        "name": "Fireplace",
+        "state_attributes": {
+          "hint": {
+            "state": {
+              "hold_to_toggle": "Long press to toggle"
+            }
+          }
+        }
       },
       "flame_off": {
         "name": "Pilot flame"

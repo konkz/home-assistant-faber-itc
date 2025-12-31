@@ -51,7 +51,14 @@
     },
     "switch": {
       "power": {
-        "name": "Kamin"
+        "name": "Kamin",
+        "state_attributes": {
+          "hint": {
+            "state": {
+              "hold_to_toggle": "Zum umschalten lange drücken"
+            }
+          }
+        }
       },
       "flame_off": {
         "name": "Zündflamme"
