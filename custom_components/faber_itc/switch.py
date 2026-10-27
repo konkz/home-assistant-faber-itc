@@ -1,5 +1,6 @@
 import logging
 from homeassistant.components.switch import SwitchEntity
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -41,6 +42,18 @@ class FaberBaseSwitch(CoordinatorEntity, SwitchEntity):
         super().__init__(coordinator)
         self._entry = entry
         self._client = coordinator.client
+
+    async def _send(self, expected: dict, command):
+        """Show the expected state, send the command and roll back if it fails."""
+        previous = self.coordinator.data
+        self.coordinator.async_set_expected_state(expected)
+        try:
+            await command()
+        except Exception as err:
+            if previous is not None:
+                self.coordinator.async_set_updated_data(previous)
+            raise HomeAssistantError(f"Faber ITC: command not sent ({err})") from err
+        await self.coordinator.async_request_refresh()
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -93,14 +106,10 @@ class FaberPowerSwitch(FaberBaseSwitch):
         }
 
     async def async_turn_on(self, **kwargs):
-        self.coordinator.async_set_expected_state({"state": 1})
-        await self._client.turn_on()
-        await self.coordinator.async_request_refresh()
+        await self._send({"state": 1}, self._client.turn_on)
 
     async def async_turn_off(self, **kwargs):
-        self.coordinator.async_set_expected_state({"state": 0})
-        await self._client.turn_off()
-        await self.coordinator.async_request_refresh()
+        await self._send({"state": 0}, self._client.turn_off)
 
 class FaberFlameLevelSwitch(FaberBaseSwitch):
     """Switch representing a specific flame level."""
@@ -149,28 +158,27 @@ class FaberFlameLevelSwitch(FaberBaseSwitch):
         return self._level == closest_lvl
 
     async def async_turn_on(self, **kwargs):
-        # Ensure fireplace is on
-        if self.coordinator.data.get("state", STATE_OFF) == STATE_OFF:
-            self.coordinator.async_set_expected_state({"state": 1})
-            await self._client.turn_on()
-
         protocol_value = INTENSITY_LEVELS.get(self._level, 0x00)
-        self.coordinator.async_set_expected_state({"flame_height": protocol_value})
-        await self._client.set_flame_height(protocol_value)
-        await self.coordinator.async_request_refresh()
+        expected = {"flame_height": protocol_value}
+        # Ensure fireplace is on
+        needs_ignition = (self.coordinator.data or {}).get("state", STATE_OFF) == STATE_OFF
+        if needs_ignition:
+            expected["state"] = 1
+
+        async def command():
+            if needs_ignition:
+                await self._client.turn_on()
+            await self._client.set_flame_height(protocol_value)
+
+        await self._send(expected, command)
 
     async def async_turn_off(self, **kwargs):
-        # Turning off pilot flame (level 0) just re-sends the command to stay on
-        if self._level == 0:
-            self.coordinator.async_set_expected_state({"flame_height": INTENSITY_LEVELS[0]})
-            await self._client.set_flame_height(INTENSITY_LEVELS[0])
-            await self.coordinator.async_request_refresh()
-            return
-
-        # Turning off levels 1-4 reverts to pilot flame (level 0)
-        self.coordinator.async_set_expected_state({"flame_height": INTENSITY_LEVELS[0]})
-        await self._client.set_flame_height(INTENSITY_LEVELS[0])
-        await self.coordinator.async_request_refresh()
+        # Level 0 (pilot flame) just re-sends the command to stay on,
+        # levels 1-4 revert to the pilot flame
+        await self._send(
+            {"flame_height": INTENSITY_LEVELS[0]},
+            lambda: self._client.set_flame_height(INTENSITY_LEVELS[0]),
+        )
 
 class FaberBurnerModeSwitch(FaberBaseSwitch):
     """Switch representing burner width (Narrow/Wide)."""
@@ -192,13 +200,11 @@ class FaberBurnerModeSwitch(FaberBaseSwitch):
 
     async def async_turn_on(self, **kwargs):
         protocol_value = WIDTH_WIDE if self._wide else WIDTH_NARROW
-        self.coordinator.async_set_expected_state({"flame_width": protocol_value})
-        await self._client.set_flame_width(self._wide)
-        await self.coordinator.async_request_refresh()
+        await self._send(
+            {"flame_width": protocol_value},
+            lambda: self._client.set_flame_width(self._wide),
+        )
 
     async def async_turn_off(self, **kwargs):
         # Turning off a burner mode just re-sends the command for the current mode
-        protocol_value = WIDTH_WIDE if self._wide else WIDTH_NARROW
-        self.coordinator.async_set_expected_state({"flame_width": protocol_value})
-        await self._client.set_flame_width(self._wide)
-        await self.coordinator.async_request_refresh()
+        await self.async_turn_on()

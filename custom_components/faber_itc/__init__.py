@@ -8,26 +8,36 @@ from .coordinator import FaberITCUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+STATIC_PATH_REGISTERED = f"{DOMAIN}_static_path_registered"
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Faber ITC from a config entry."""
     _LOGGER.debug("Setting up integration for host: %s", entry.data.get(CONF_HOST))
     
-    # Register 'branding' folder for entity icons
-    await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(
-                "/faber_itc_static",
-                hass.config.path("custom_components/faber_itc/branding"),
-                True,
-            )
-        ]
-    )
+    # Register 'branding' folder for entity icons (once, setup may be retried)
+    if not hass.data.get(STATIC_PATH_REGISTERED):
+        await hass.http.async_register_static_paths(
+            [
+                StaticPathConfig(
+                    "/faber_itc_static",
+                    hass.config.path("custom_components/faber_itc/branding"),
+                    True,
+                )
+            ]
+        )
+        hass.data[STATIC_PATH_REGISTERED] = True
     
     host = entry.data[CONF_HOST]
     client = FaberITCClient(host, DEFAULT_PORT)
-    coordinator = FaberITCUpdateCoordinator(hass, client)
+    coordinator = FaberITCUpdateCoordinator(hass, client, entry)
     
-    await coordinator.async_config_entry_first_refresh()
+    # Bounded by UPDATE_TIMEOUT; raises ConfigEntryNotReady (HA retries later)
+    # instead of blocking the HA start when the controller does not answer.
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except BaseException:
+        await client.disconnect()
+        raise
     
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
