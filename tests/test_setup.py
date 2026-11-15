@@ -113,7 +113,7 @@ def test_setup_with_controller_loads(tmp_path, monkeypatch):
         entry = _entry()
         try:
             assert await asyncio.wait_for(integration.async_setup_entry(hass, entry), 5)
-            assert hass.config_entries.forwarded == [["sensor", "switch"]]
+            assert hass.config_entries.forwarded == [integration.PLATFORMS]
             coordinator = hass.data[DOMAIN][entry.entry_id]
             await asyncio.sleep(0.3)
             assert coordinator.data["temp"] == 22.4

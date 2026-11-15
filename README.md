@@ -11,6 +11,11 @@ Steuere deinen Faber Gaskamin lokal über Home Assistant. Diese Integration verb
 - **Power & Status:** Kamin an-/ausschalten inkl. Anzeige des Zündvorgangs.
 - **Flammensteuerung:** 5 Stufen inkl. permanenter **Zündflamme** (Pilot flame) und Wechsel zwischen schmalem/breitem Brenner.
 - **Temperatur:** Aktuelle Raumtemperatur direkt vom Controller auslesen.
+- **Flammenhöhe in Prozent:** `number`-Entität (0–100 % in 25-%-Schritten). 0 % schaltet den Kamin aus; ist er aus, zündet er und stellt danach die gewählte Höhe ein.
+- **Flammenbreite:** `select`-Entität Schmal/Breit.
+- **Thermostat:** `climate`-Entität, regelt die Flammenhöhe nach der Raumtemperatur des Controllers. Sie zündet und löscht den Kamin nie selbst und schaltet sich ab, sobald jemand die Flamme von Hand verstellt.
+- **Langsame Rückmeldungen:** Der Controller meldet einen neuen Zustand erst nach einigen Sekunden (Zünden/Ausgehen ca. 40 s). Bis dahin zeigt HA „Zündet …“/„Geht aus …“ bzw. den gewählten Wert, statt zurückzuspringen.
+- **Eigene Karte:** `custom:faber-itc-card` mit Drehregler für die Flammenhöhe (siehe unten).
 - **Lokal:** Kommunikation erfolgt direkt über TCP (Port 58779).
 
 ---
@@ -37,6 +42,21 @@ Kopiere den Ordner `custom_components/faber_itc` in dein HA-Verzeichnis und star
 
 ---
 *Getestet mit Aspect Premium RD L (M4435200)*
+
+---
+
+### 🔥 Kamin-Karte
+Die Integration bringt eine eigene Karte mit: Drehregler für die Flammenhöhe, Schmal/Breit, Ein/Aus (gedrückt halten) und Thermostat. Die Texte erscheinen auf Deutsch oder Englisch, je nach HA-Sprache.
+
+1. **Einstellungen > Dashboards > ⋮ > Ressourcen > Ressource hinzufügen:** URL `/faber_itc_card/faber-itc-card.js`, Typ **JavaScript-Modul**.
+2. Karte hinzufügen:
+
+```yaml
+type: custom:faber-itc-card
+# optional, bei mehreren Kaminen:
+# device_id: <DEVICE_ID>
+# name: Kamin
+```
 
 ---
 
@@ -218,6 +238,11 @@ Control your Faber gas fireplace locally via Home Assistant. This integration co
 - **Power & Status:** Turn fireplace on/off including ignition status.
 - **Flame Control:** 5 levels including permanent **Pilot flame** and toggle between narrow/wide burners.
 - **Temperature:** Read current room temperature directly from the controller.
+- **Flame height in percent:** `number` entity (0–100 % in 25 % steps). 0 % turns the fireplace off; if it is off, it ignites and then sets the chosen height.
+- **Flame width:** `select` entity narrow/wide.
+- **Thermostat:** `climate` entity that adjusts the flame height to the controller's room temperature. It never ignites or turns off the fireplace and switches itself off as soon as someone changes the flame by hand.
+- **Slow feedback:** The controller reports a new state only after a few seconds (ignition/turning off about 40 s). Until then HA shows "Igniting …"/"Turning off …" or the chosen value instead of jumping back.
+- **Custom card:** `custom:faber-itc-card` with a dial for the flame height (see below).
 - **Local:** Communication via direct TCP (Port 58779).
 
 ---
@@ -244,6 +269,21 @@ Copy the `custom_components/faber_itc` folder to your HA directory and restart.
 
 ---
 *Tested with Aspect Premium RD L (M4435200)*
+
+---
+
+### 🔥 Fireplace card
+The integration ships its own card: a dial for the flame height, narrow/wide, on/off (press and hold) and the thermostat. Texts are shown in German or English, depending on the HA language.
+
+1. **Settings > Dashboards > ⋮ > Resources > Add resource:** URL `/faber_itc_card/faber-itc-card.js`, type **JavaScript module**.
+2. Add the card:
+
+```yaml
+type: custom:faber-itc-card
+# optional, with several fireplaces:
+# device_id: <DEVICE_ID>
+# name: Fireplace
+```
 
 ---
 

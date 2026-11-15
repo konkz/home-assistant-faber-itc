@@ -81,6 +81,33 @@
       "mode_wide": {
         "name": "Wide"
       }
+    },
+    "number": {
+      "flame_height": {
+        "name": "Flame height"
+      }
+    },
+    "select": {
+      "flame_width": {
+        "name": "Flame width",
+        "state": {
+          "narrow": "Narrow",
+          "wide": "Wide"
+        }
+      }
+    },
+    "climate": {
+      "thermostat": {
+        "name": "Thermostat"
+      }
+    }
+  },
+  "exceptions": {
+    "fireplace_off": {
+      "message": "The fireplace is off. Please turn it on first."
+    },
+    "shutting_down": {
+      "message": "The fireplace is going out. Please wait until it is off."
     }
   }
 }
