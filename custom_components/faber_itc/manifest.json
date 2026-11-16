@@ -4,7 +4,7 @@
   "documentation": "https://github.com/konkz/home-assistant-faber-itc",
   "dependencies": [],
   "codeowners": ["@konkz"],
-  "version": "0.5.11",
+  "version": "0.6.0",
   "config_flow": true,
   "iot_class": "local_polling"
 }
