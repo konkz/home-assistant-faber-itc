@@ -31,7 +31,6 @@ class FaberITCClient:
         self._read_task = None
         self._callback = None
         self._last_data_time = 0
-        self._reconnect_delay = 1
         self.device_info = {
             "model": "Faber ITC Fireplace",
             "manufacturer": "Faber",
@@ -72,29 +71,43 @@ class FaberITCClient:
                     self._read_task.cancel()
                 self._read_task = asyncio.create_task(self._read_loop())
                 self._last_data_time = asyncio.get_running_loop().time()
-                
+
                 _LOGGER.debug("Connected to %s:%s", self.host, self.port)
                 return True
+            except asyncio.CancelledError:
+                self._drop_connection()
+                raise
             except Exception as e:
                 _LOGGER.debug("Connection failed: %s", e)
-                await self.disconnect()
+                # The lock is already held here, so never call disconnect()
+                # (it would wait for the lock forever).
+                self._drop_connection()
                 return False
+
+    def _drop_connection(self):
+        """Forget the current connection without waiting; returns the old writer."""
+        if self._read_task:
+            self._read_task.cancel()
+            self._read_task = None
+        writer = self._writer
+        self._writer = None
+        self._reader = None
+        if writer:
+            try:
+                writer.close()
+            except Exception:
+                pass
+        return writer
 
     async def disconnect(self):
         """Close connection."""
         async with self._lock:
-            if self._read_task:
-                self._read_task.cancel()
-                self._read_task = None
-            if self._writer:
-                try:
-                    self._writer.close()
-                    await self._writer.wait_closed()
-                except:
-                    pass
-                finally:
-                    self._writer = None
-            self._reader = None
+            writer = self._drop_connection()
+        if writer:
+            try:
+                await asyncio.wait_for(writer.wait_closed(), timeout=TCP_TIMEOUT)
+            except Exception:
+                pass
 
     async def _send_frame(self, opcode: int, payload: bytes):
         """Build and send a protocol frame."""
@@ -106,10 +119,13 @@ class FaberITCClient:
             + payload
             + MAGIC_END
         )
-        if self._writer:
-            self._writer.write(frame)
-            await self._writer.drain()
-            _LOGGER.debug("Sent Opcode 0x%08X, Payload: %s", opcode, payload.hex())
+        if not self._writer:
+            # Used to be dropped silently, which made commands vanish while the
+            # connection was down.
+            raise ConnectionError(f"Not connected to {self.host}:{self.port}")
+        self._writer.write(frame)
+        await asyncio.wait_for(self._writer.drain(), timeout=TCP_TIMEOUT)
+        _LOGGER.debug("Sent Opcode 0x%08X, Payload: %s", opcode, payload.hex())
 
     async def _read_loop(self):
         """Background loop to process incoming frames."""
@@ -139,11 +155,14 @@ class FaberITCClient:
                     self._handle_frame(frame)
                     
         except asyncio.CancelledError:
-            pass
+            # Cancelled by connect()/disconnect(), which handle the connection.
+            return
         except Exception as e:
             _LOGGER.error("Read loop error: %s", e)
-        finally:
-            asyncio.create_task(self.disconnect())
+        # Only drop the connection this loop belongs to, never a newer one.
+        if self._read_task is asyncio.current_task():
+            self._read_task = None
+            self._drop_connection()
 
     def _handle_frame(self, data: bytes):
         """Parse received frames."""
@@ -190,6 +209,9 @@ class FaberITCClient:
         
         elif opcode_base in [OP_IDENTIFY, OP_INFO_410, OP_INFO_1010]:
             self._parse_ascii_info(opcode_base, payload)
+
+        else:
+            _LOGGER.debug("Unhandled Opcode 0x%08X, Payload: %s", opcode_raw, payload.hex())
 
     def _parse_ascii_info(self, opcode_base, payload):
         """Extract device metadata from payload (null-terminated strings)."""
@@ -243,7 +265,9 @@ class FaberITCClient:
             _LOGGER.info("Installer Info Updated: Name=%s", self.device_info["installer_name"])
 
     async def _send_control(self, param_id: int, value: int):
-        """Helper to send control commands."""
+        """Helper to send control commands (reconnects if needed)."""
+        if not self._writer and not await self.connect():
+            raise ConnectionError(f"Cannot connect to {self.host}:{self.port}")
         payload = (
             b"\xFF\xFF"
             + struct.pack(">H", param_id)
@@ -297,19 +321,17 @@ class FaberITCClient:
         await self.update()
 
     async def fetch_data(self):
-        """Watchdog check and return latest cached status."""
+        """Watchdog check, (re)connect and return latest cached status.
+
+        Raises ConnectionError if the controller cannot be reached, so the
+        coordinator reports a failed update instead of stale default values.
+        """
         now = asyncio.get_running_loop().time()
         if self._writer and (now - self._last_data_time > WATCHDOG_TIMEOUT):
             _LOGGER.debug("Watchdog: No data for %ss, reconnecting", WATCHDOG_TIMEOUT)
             await self.disconnect()
 
-        if not self._writer:
-            try:
-                await self.connect()
-                self._reconnect_delay = 1
-            except Exception as e:
-                _LOGGER.debug("Reconnect failed: %s, retrying later", e)
-                await asyncio.sleep(self._reconnect_delay)
-                self._reconnect_delay = min(self._reconnect_delay * 2, 60)
+        if not self._writer and not await self.connect():
+            raise ConnectionError(f"Cannot connect to {self.host}:{self.port}")
 
-        return self.last_status
+        return dict(self.last_status)

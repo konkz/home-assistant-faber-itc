@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 import logging
 
@@ -6,15 +7,21 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 _LOGGER = logging.getLogger(__name__)
 
+# Upper bound for one refresh (TCP connect alone may take 10 s). Keeps a slow or
+# unreachable controller from blocking the HA start: the first refresh fails in
+# time and setup is retried via ConfigEntryNotReady.
+UPDATE_TIMEOUT = 20
+
 class FaberITCUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching Faber ITC data."""
 
-    def __init__(self, hass, client):
+    def __init__(self, hass, client, config_entry=None):
         """Initialize."""
         self.client = client
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name="Faber ITC Status",
             update_interval=timedelta(seconds=10),
         )
@@ -39,16 +46,18 @@ class FaberITCUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Fetch data from client."""
         try:
-            # Fetch device info if missing
-            info = self.client.device_info
-            if not info.get("serial") or not info.get("installer_name"):
-                _LOGGER.debug("Missing device or installer info, requesting...")
-                await self.client.request_info()
+            async with asyncio.timeout(UPDATE_TIMEOUT):
+                # Connect first, otherwise the requests below go nowhere
+                await self.client.fetch_data()
 
-            await self.client.update()
-            data = await self.client.fetch_data()
-            if data is None:
-                return {}
-            return data
+                # Fetch device info if missing
+                info = self.client.device_info
+                if not info.get("serial") or not info.get("installer_name"):
+                    _LOGGER.debug("Missing device or installer info, requesting...")
+                    await self.client.request_info()
+
+                await self.client.update()
+            # Latest status, the answer to update() may already be in
+            return dict(self.client.last_status)
         except Exception as err:
             raise UpdateFailed(f"Error communicating with API: {err}")
