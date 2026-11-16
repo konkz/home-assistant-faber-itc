@@ -1,19 +1,25 @@
 import logging
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
-    CONF_SENDER_ID,
     INTENSITY_LEVELS,
+    STATE_IGNITING,
     STATE_OFF,
+    STATE_ON,
+    STATE_SHUTTING_DOWN,
     WIDTH_WIDE,
     WIDTH_NARROW,
 )
+from .entity import FaberEntity
 
 _LOGGER = logging.getLogger(__name__)
+
+STATUS_NAMES = {
+    STATE_OFF: "off",
+    STATE_ON: "on",
+    STATE_IGNITING: "igniting",
+    STATE_SHUTTING_DOWN: "shutting_down",
+}
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the Faber ITC switch platform."""
@@ -34,51 +40,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
     
     async_add_entities(entities)
 
-class FaberBaseSwitch(CoordinatorEntity, SwitchEntity):
+class FaberBaseSwitch(FaberEntity, SwitchEntity):
     """Base class for Faber switches."""
-    _attr_has_entity_name = True
-
-    def __init__(self, coordinator, entry):
-        super().__init__(coordinator)
-        self._entry = entry
-        self._client = coordinator.client
-
-    async def _send(self, expected: dict, command):
-        """Show the expected state, send the command and roll back if it fails."""
-        previous = self.coordinator.data
-        self.coordinator.async_set_expected_state(expected)
-        try:
-            await command()
-        except Exception as err:
-            if previous is not None:
-                self.coordinator.async_set_updated_data(previous)
-            raise HomeAssistantError(f"Faber ITC: command not sent ({err})") from err
-        await self.coordinator.async_request_refresh()
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        info = self.coordinator.client.device_info
-        model_name = info.get("model")
-        if not model_name or model_name == "Faber ITC Fireplace":
-            model_name = self._entry.data.get("name") or "Faber ITC Fireplace"
-            
-        sender_id = self._entry.data.get(CONF_SENDER_ID)
-        
-        identifiers = {(DOMAIN, self._entry.entry_id)}
-        connections = set()
-        if sender_id:
-            identifiers.add((DOMAIN, sender_id))
-            formatted_mac = ":".join(sender_id[i:i+2] for i in range(0, len(sender_id), 2))
-            connections.add((dr.CONNECTION_NETWORK_MAC, formatted_mac))
-
-        return DeviceInfo(
-            identifiers=identifiers,
-            connections=connections,
-            name=model_name,
-            manufacturer=info.get("manufacturer", "Faber"),
-            model=model_name,
-            serial_number=info.get("serial"),
-        )
 
 class FaberPowerSwitch(FaberBaseSwitch):
     """Main power switch for the fireplace."""
@@ -95,21 +58,22 @@ class FaberPowerSwitch(FaberBaseSwitch):
 
     @property
     def is_on(self):
-        if not self.coordinator.data:
-            return False
-        return self.coordinator.data.get("state", STATE_OFF) != STATE_OFF
+        return self.fireplace_burning
+
     @property
     def extra_state_attributes(self):
         """Return entity specific state attributes."""
+        state = (self.coordinator.data or {}).get("state", STATE_OFF)
         return {
             "hint": "hold_to_toggle",
+            "status": STATUS_NAMES.get(state, "on"),
         }
 
     async def async_turn_on(self, **kwargs):
-        await self._send({"state": 1}, self._client.turn_on)
+        await self._set_power(True)
 
     async def async_turn_off(self, **kwargs):
-        await self._send({"state": 0}, self._client.turn_off)
+        await self._set_power(False)
 
 class FaberFlameLevelSwitch(FaberBaseSwitch):
     """Switch representing a specific flame level."""
@@ -136,7 +100,7 @@ class FaberFlameLevelSwitch(FaberBaseSwitch):
         if not self.coordinator.data:
             return False
 
-        is_fireplace_on = self.coordinator.data.get("state", STATE_OFF) != STATE_OFF
+        is_fireplace_on = self.fireplace_burning
 
         # Pilot flame (level 0) is "on" whenever the fireplace is on
         if self._level == 0:
@@ -158,27 +122,15 @@ class FaberFlameLevelSwitch(FaberBaseSwitch):
         return self._level == closest_lvl
 
     async def async_turn_on(self, **kwargs):
-        protocol_value = INTENSITY_LEVELS.get(self._level, 0x00)
-        expected = {"flame_height": protocol_value}
-        # Ensure fireplace is on
-        needs_ignition = (self.coordinator.data or {}).get("state", STATE_OFF) == STATE_OFF
-        if needs_ignition:
-            expected["state"] = 1
-
-        async def command():
-            if needs_ignition:
-                await self._client.turn_on()
-            await self._client.set_flame_height(protocol_value)
-
-        await self._send(expected, command)
+        # Ignites the fireplace if needed; level 0 is the pilot flame here
+        await self._set_flame(INTENSITY_LEVELS[self._level], zero_is_off=False)
 
     async def async_turn_off(self, **kwargs):
-        # Level 0 (pilot flame) just re-sends the command to stay on,
-        # levels 1-4 revert to the pilot flame
-        await self._send(
-            {"flame_height": INTENSITY_LEVELS[0]},
-            lambda: self._client.set_flame_height(INTENSITY_LEVELS[0]),
-        )
+        # Off is off: turning off the active level turns the fireplace off
+        # (it used to fall back to the pilot flame, which kept burning)
+        if self.is_on:
+            self.coordinator.async_manual_flame_change()
+            await self._set_power(False)
 
 class FaberBurnerModeSwitch(FaberBaseSwitch):
     """Switch representing burner width (Narrow/Wide)."""

@@ -81,6 +81,33 @@
       "mode_wide": {
         "name": "Breit"
       }
+    },
+    "number": {
+      "flame_height": {
+        "name": "Flammenhöhe"
+      }
+    },
+    "select": {
+      "flame_width": {
+        "name": "Flammenbreite",
+        "state": {
+          "narrow": "Schmal",
+          "wide": "Breit"
+        }
+      }
+    },
+    "climate": {
+      "thermostat": {
+        "name": "Thermostat"
+      }
+    }
+  },
+  "exceptions": {
+    "fireplace_off": {
+      "message": "Der Kamin ist aus. Bitte zuerst einschalten."
+    },
+    "shutting_down": {
+      "message": "Der Kamin geht gerade aus. Bitte warten, bis er aus ist."
     }
   }
 }

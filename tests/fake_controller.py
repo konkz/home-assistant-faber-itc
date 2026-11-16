@@ -27,10 +27,17 @@ def status_frame(state=0, flame=0, width=0x64, temp=20.5) -> bytes:
 
 
 class FakeController:
-    """Answers status requests and records control commands."""
+    """Answers status requests, records control commands and applies them."""
 
-    def __init__(self, temp=20.5):
+    def __init__(self, temp=20.5, state=0, flame=0, width=0x64):
         self.temp = temp
+        self.state = state
+        self.flame = flame
+        self.width = width
+        # The real controller reports a new power state only ~40 s later
+        self.apply_power = True
+        # ... and a new flame height / width a few seconds later
+        self.apply_settings = True
         self.controls = []  # (connection number, param_id, value)
         self.connections = 0
         self._writers = []
@@ -65,14 +72,34 @@ class FakeController:
                     opcode = struct.unpack(">I", raw[12:16])[0]
                     payload = raw[16:-4]
                     if opcode == OP_STATUS:
-                        writer.write(status_frame(temp=self.temp))
+                        writer.write(
+                            status_frame(self.state, self.flame, self.width, self.temp)
+                        )
                         await writer.drain()
                     elif opcode == OP_CONTROL:
                         param = struct.unpack(">H", payload[2:4])[0]
                         value = struct.unpack("<H", payload[7:9])[0]
                         self.controls.append((conn, param, value))
+                        self._apply(param, value)
         except ConnectionError:
             pass
+
+
+    def _apply(self, param, value):
+        if param in (0x0001, 0x0002, 0x0020) and not self.apply_power:
+            return
+        if param in (0x0005, 0x0006, 0x0009) and not self.apply_settings:
+            return
+        if param == 0x0001:
+            self.state = 0
+        elif param == 0x0020:
+            self.state = 1
+        elif param == 0x0005:
+            self.width = 0x32
+        elif param == 0x0006:
+            self.width = 0x64
+        elif param == 0x0009:
+            self.flame = value
 
 
 def closed_port() -> int:
