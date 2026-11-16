@@ -71,6 +71,9 @@ def test_control_reconnects_after_connection_loss():
         client = FaberITCClient("127.0.0.1", fake.port)
         try:
             assert await client.connect()
+            # let the fake controller's handler register the connection first,
+            # otherwise drop_clients() closes nothing (race on some platforms)
+            await asyncio.sleep(0.05)
             fake.drop_clients()
             await asyncio.sleep(0.2)
             assert client._writer is None  # read loop noticed the loss
