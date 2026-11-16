@@ -2,6 +2,8 @@ import logging
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.lovelace.const import LOVELACE_DATA
+
 from .const import DOMAIN, CONF_HOST, DEFAULT_PORT
 from .client import FaberITCClient
 from .coordinator import FaberITCUpdateCoordinator
@@ -9,7 +11,34 @@ from .coordinator import FaberITCUpdateCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 STATIC_PATH_REGISTERED = f"{DOMAIN}_static_path_registered"
+CARD_RESOURCE_URL = "/faber_itc_card/faber-itc-card.js"
 PLATFORMS = ["sensor", "switch", "number", "select", "climate"]
+
+
+async def async_register_card_resource(hass: HomeAssistant):
+    """Register the dashboard card as a Lovelace resource (idempotent).
+
+    Only possible in Lovelace storage mode (the default); in YAML mode the
+    resources live in configuration.yaml and cannot be written.
+    """
+    try:
+        resources = getattr(hass.data.get(LOVELACE_DATA), "resources", None)
+        if resources is None or not hasattr(resources, "async_create_item"):
+            _LOGGER.info(
+                "Lovelace runs in YAML mode - please add the card resource manually: %s",
+                CARD_RESOURCE_URL,
+            )
+            return
+        if CARD_RESOURCE_URL in {item.get("url") for item in resources.async_items()}:
+            return
+        await resources.async_create_item(
+            {"res_type": "module", "url": CARD_RESOURCE_URL}
+        )
+        _LOGGER.debug("Registered dashboard card resource: %s", CARD_RESOURCE_URL)
+    except Exception as err:
+        _LOGGER.warning(
+            "Could not register the dashboard card resource automatically: %s", err
+        )
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Faber ITC from a config entry."""
@@ -33,7 +62,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             ]
         )
         hass.data[STATIC_PATH_REGISTERED] = True
-    
+
+    # Register the dashboard card so no manual "Add resource" step is needed
+    await async_register_card_resource(hass)
+
     host = entry.data[CONF_HOST]
     client = FaberITCClient(host, DEFAULT_PORT)
     coordinator = FaberITCUpdateCoordinator(hass, client, entry)

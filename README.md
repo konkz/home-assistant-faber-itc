@@ -48,8 +48,16 @@ Kopiere den Ordner `custom_components/faber_itc` in dein HA-Verzeichnis und star
 ### 🔥 Kamin-Karte
 Die Integration bringt eine eigene Karte mit: Drehregler für die Flammenhöhe, Schmal/Breit, Ein/Aus (gedrückt halten) und Thermostat. Die Texte erscheinen auf Deutsch oder Englisch, je nach HA-Sprache.
 
-1. **Einstellungen > Dashboards > ⋮ > Ressourcen > Ressource hinzufügen:** URL `/faber_itc_card/faber-itc-card.js`, Typ **JavaScript-Modul**.
-2. Karte hinzufügen:
+Die Ressource wird beim Einrichten der Integration **automatisch registriert** – kein manueller Schritt nötig. Nur wenn Lovelace im YAML-Modus läuft, bitte ergänzen:
+
+```yaml
+lovelace:
+  resources:
+    - url: /faber_itc_card/faber-itc-card.js
+      type: module
+```
+
+1. Karte hinzufügen:
 
 ```yaml
 type: custom:faber-itc-card
@@ -275,8 +283,16 @@ Copy the `custom_components/faber_itc` folder to your HA directory and restart.
 ### 🔥 Fireplace card
 The integration ships its own card: a dial for the flame height, narrow/wide, on/off (press and hold) and the thermostat. Texts are shown in German or English, depending on the HA language.
 
-1. **Settings > Dashboards > ⋮ > Resources > Add resource:** URL `/faber_itc_card/faber-itc-card.js`, type **JavaScript module**.
-2. Add the card:
+The resource is **registered automatically** when the integration is set up – no manual step needed. Only if Lovelace runs in YAML mode, add it manually:
+
+```yaml
+lovelace:
+  resources:
+    - url: /faber_itc_card/faber-itc-card.js
+      type: module
+```
+
+1. Add the card:
 
 ```yaml
 type: custom:faber-itc-card

@@ -1,6 +1,6 @@
 """Config entry setup: an unreachable controller must not block the HA start."""
 import asyncio
-from types import MappingProxyType
+from types import MappingProxyType, SimpleNamespace
 
 import pytest
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
@@ -136,5 +136,60 @@ def test_switch_rolls_back_when_command_fails(tmp_path):
             await asyncio.wait_for(switch.async_turn_on(), 5)
         assert coordinator.data["state"] == 0
         assert not switch.is_on
+
+    asyncio.run(scenario())
+
+class FakeResources:
+    """Lovelace storage-mode resource collection."""
+
+    def __init__(self):
+        self.items = []
+        self.created = []
+
+    def async_items(self):
+        return list(self.items)
+
+    async def async_create_item(self, data):
+        self.created.append(data)
+        self.items.append(dict(data, id="card"))
+
+
+class FakeYamlResources:
+    """Lovelace YAML-mode resources: a read-only list."""
+
+    def async_items(self):
+        return [{"url": "/local/foo.js"}]
+
+
+def test_card_resource_is_registered_once():
+    async def scenario():
+        res = FakeResources()
+        hass = SimpleNamespace(data={"lovelace": SimpleNamespace(resources=res)})
+        await integration.async_register_card_resource(hass)
+        assert res.created == [
+            {"res_type": "module", "url": "/faber_itc_card/faber-itc-card.js"}
+        ]
+        # a second (retried) setup must not create it again
+        await integration.async_register_card_resource(hass)
+        assert len(res.created) == 1
+
+    asyncio.run(scenario())
+
+
+def test_card_resource_yaml_mode_is_a_no_op():
+    """In YAML mode there is no async_create_item: log a hint, don't crash."""
+
+    async def scenario():
+        hass = SimpleNamespace(
+            data={"lovelace": SimpleNamespace(resources=FakeYamlResources())}
+        )
+        await integration.async_register_card_resource(hass)
+
+    asyncio.run(scenario())
+
+
+def test_card_resource_without_lovelace_is_a_no_op():
+    async def scenario():
+        await integration.async_register_card_resource(SimpleNamespace(data={}))
 
     asyncio.run(scenario())

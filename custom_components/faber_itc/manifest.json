@@ -2,7 +2,7 @@
   "domain": "faber_itc",
   "name": "Faber ITC Fireplace",
   "documentation": "https://github.com/konkz/home-assistant-faber-itc",
-  "dependencies": [],
+  "dependencies": ["lovelace"],
   "codeowners": ["@konkz"],
   "version": "0.6.0",
   "config_flow": true,
