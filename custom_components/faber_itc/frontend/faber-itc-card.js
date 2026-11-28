@@ -1,6 +1,6 @@
 // Faber ITC fireplace card: flame dial (off / 25-100 %), narrow <> wide, thermostat.
 // Usage: type: custom:faber-itc-card (optional: device_id, name)
-const FABER_CARD_VERSION = "0.6.1";
+const FABER_CARD_VERSION = "0.6.2";
 
 // German for a German UI language, English otherwise
 const STRINGS = {
