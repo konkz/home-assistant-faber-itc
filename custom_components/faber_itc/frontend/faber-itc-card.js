@@ -5,7 +5,7 @@ const FABER_CARD_VERSION = "0.6.1";
 // German for a German UI language, English otherwise
 const STRINGS = {
   de: {
-    off: "Aus", pilot: "Zünd­flamme", flameHeight: "Flammenhöhe", narrow: "Schmal", wide: "Breit",
+    off: "Aus", pilot: "Zünd­flamme", flameHeight: "Flammenhöhe", turnOnFirst: "Erst einschalten", narrow: "Schmal", wide: "Breit",
     room: "Raum °C", holdHint: "Gedrückt halten", holdToSwitch: "Zum Ein- oder Ausschalten gedrückt halten",
     waitIgniting: "Kamin zündet …", waitShuttingDown: "Kamin geht aus …", waiting: "Warte auf Kamin …",
     unavailable: "Nicht erreichbar", igniting: "Zündet …", shuttingDown: "Geht aus …",
@@ -16,7 +16,7 @@ const STRINGS = {
     missing: "Keine Faber-ITC-Entitäten gefunden.",
   },
   en: {
-    off: "Off", pilot: "Pilot", flameHeight: "Flame height", narrow: "Narrow", wide: "Wide",
+    off: "Off", pilot: "Pilot", flameHeight: "Flame height", turnOnFirst: "Turn on first", narrow: "Narrow", wide: "Wide",
     room: "Room °C", holdHint: "Press and hold", holdToSwitch: "Press and hold to turn on or off",
     waitIgniting: "Igniting …", waitShuttingDown: "Turning off …", waiting: "Waiting for fireplace …",
     unavailable: "Unavailable", igniting: "Igniting …", shuttingDown: "Turning off …",
@@ -120,6 +120,8 @@ class FaberItcCard extends HTMLElement {
         .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; transform: translateY(8%); }
         .center b { font-size: 38px; font-weight: 700; line-height: 1; }
         .center span { margin-top: 2px; font-size: 12px; color: var(--muted); }
+        .dial-wrap.locked { opacity: .45; }
+        .dial-wrap.locked svg { pointer-events: none; touch-action: auto; }
         .spinner { fill: none; stroke: var(--fire); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 70 383; opacity: 0; transition: opacity .3s; transform-box: view-box; transform-origin: ${CX}px ${CY}px; }
         .waiting .spinner { opacity: .85; animation: spin 1.1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -198,7 +200,7 @@ class FaberItcCard extends HTMLElement {
     this._bindDial();
     this._bindPower();
     this._el.widths.forEach((b) => b.addEventListener("click", () => this._setWidth(b.dataset.width)));
-    this._el.labels.forEach((l) => l.addEventListener("click", (ev) => { ev.stopPropagation(); this._setFlame(Number(l.dataset.v)); }));
+    this._el.labels.forEach((l) => l.addEventListener("click", (ev) => { ev.stopPropagation(); if (!this._locked()) this._setFlame(Number(l.dataset.v)); }));
     this.shadowRoot.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => this._stepTarget(Number(b.dataset.step))));
     // Own toggle instead of ha-switch: the frontend only loads ha-switch when a built-in card needs it
     this._el.thermoSwitch.addEventListener("click", () => {
@@ -220,7 +222,7 @@ class FaberItcCard extends HTMLElement {
       return (rel / ARC_SPAN) * 100;
     };
     svg.addEventListener("pointerdown", (ev) => {
-      if (ev.target.classList.contains("tick-label")) return;
+      if (ev.target.classList.contains("tick-label") || this._locked()) return;
       svg.setPointerCapture(ev.pointerId);
       this._drag = valueAt(ev);
       this._renderDial();
@@ -315,6 +317,13 @@ class FaberItcCard extends HTMLElement {
 
   _status() { return this._state("power")?.attributes?.status || (this._state("power")?.state === "on" ? "on" : "off"); }
 
+  // While the fireplace is off the dial is locked: setting a flame height would ignite it,
+  // and a stray tap while scrolling must not do that. It is started with the power button.
+  _locked() {
+    const status = this._status();
+    return status !== "on" && status !== "igniting";
+  }
+
   _flameValue() {
     const n = Number(this._state("flame")?.state);
     return isNaN(n) ? 0 : snap(n);
@@ -341,8 +350,11 @@ class FaberItcCard extends HTMLElement {
     let text = snapped === 0 ? t.off : `${snapped} %`;
     let sub = t.flameHeight;
     if (snapped === 0 && burning && this._drag == null && !this._pendingFlame) { text = t.pilot; sub = "0 %"; }
+    const locked = this._locked();
+    if (locked) sub = t.turnOnFirst;
     if (waiting) sub = status === "igniting" ? t.waitIgniting : status === "shutting_down" ? t.waitShuttingDown : t.waiting;
     this._el.svg.closest(".dial-wrap").classList.toggle("waiting", waiting);
+    this._el.svg.closest(".dial-wrap").classList.toggle("locked", locked);
     this._el.flameText.textContent = text;
     this._el.flameText.style.fontSize = text.length > 6 ? "24px" : "";
     this._el.flameSub.textContent = sub;
