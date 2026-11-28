@@ -29,7 +29,12 @@ async def async_register_card_resource(hass: HomeAssistant):
                 CARD_RESOURCE_URL,
             )
             return
-        if CARD_RESOURCE_URL in {item.get("url") for item in resources.async_items()}:
+        # compare without query string: a manually registered resource with a
+        # versioned URL (e.g. ".../faber-itc-card.js?v=1") must be recognized
+        if CARD_RESOURCE_URL in {
+            item.get("url", "").split("?", 1)[0] for item in resources.async_items()
+        }:
+            return
             return
         await resources.async_create_item(
             {"res_type": "module", "url": CARD_RESOURCE_URL}

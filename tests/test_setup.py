@@ -176,6 +176,19 @@ def test_card_resource_is_registered_once():
     asyncio.run(scenario())
 
 
+def test_card_resource_with_versioned_url_is_recognized():
+    """A manually registered resource with a query string must not be duplicated."""
+
+    async def scenario():
+        res = FakeResources()
+        res.items = [{"url": "/faber_itc_card/faber-itc-card.js?v=1"}]
+        hass = SimpleNamespace(data={"lovelace": SimpleNamespace(resources=res)})
+        await integration.async_register_card_resource(hass)
+        assert res.created == []
+
+    asyncio.run(scenario())
+
+
 def test_card_resource_yaml_mode_is_a_no_op():
     """In YAML mode there is no async_create_item: log a hint, don't crash."""
 
